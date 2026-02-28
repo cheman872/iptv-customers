@@ -86,7 +86,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
 <div class="header">
   <div class="header-left">
     <h1>&#128225; IPTV Customer Manager</h1>
-    <p>Customer database across all servers &mdash; Live from Google Sheets</p>
+    <p>Customer database across all servers &mdash; Live Data</p>
   </div>
   <button class="logout-btn" onclick="doLogout()">Logout</button>
 </div>
@@ -100,7 +100,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
   <button class="filter-btn expired-btn" data-filter="expired" onclick="setFilter('expired')">Expired</button>
 </div>
 <div class="stats" id="statsBar" style="display:none"></div>
-<div id="loadingDiv" class="loading"><div class="spinner"></div><br>Loading customer data from Google Sheets...</div>
+<div id="loadingDiv" class="loading"><div class="spinner"></div><br>Loading customer data...</div>
 <div class="table-wrap">
   <table style="display:none" id="mainTable">
     <thead><tr>
@@ -115,7 +115,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
   </table>
   <div class="no-results" id="noResults" style="display:none">No customers found matching your search.</div>
 </div>
-<footer>IPTV Customer Manager &mdash; Live data from Google Sheets &mdash; Auto-refreshes on page load</footer>
+<footer>IPTV Customer Manager &mdash; Auto-refreshes on page load</footer>
 </div>
 
 <script>
@@ -150,6 +150,8 @@ if(sessionStorage.getItem('iptv_auth')==='1'){
 }
 
 // App
+const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwSnjCFNWg4_2dE2NGByh6s1umLKk2yd-bm588c6y5gjX8xzyThR6Aoq-T-nDB2O2-F/exec';
+// Fallback: Google Sheets config (used if Apps Script has no data yet)
 const SHEET_ID='1uGu7GWmqHKIP6-2Z7LTRdBenBQovyIKS634lj7wUe34';
 const SERVERS=[{name:'Gold AMCH',gid:0},{name:'GoldSamChe',gid:78207741},{name:'Gold 4K Premium',gid:6151580},{name:'Spice',gid:1946979001},{name:'Smart Amble2',gid:950796683},{name:'Smart 2021',gid:1688805080},{name:'Titan',gid:146800598},{name:'Crown',gid:613843388},{name:'Stream 4K',gid:2123429132}];
 let allCustomers=[],currentFilter='all',currentSort={col:'name',asc:true};
@@ -201,9 +203,15 @@ function formatDate(isoDate){
   return`${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+async function fetchFromAppsScript(){try{const r=await fetch(APPS_SCRIPT_URL+'?action=getAll');if(!r.ok)return null;const data=await r.json();let customers=[];for(const[serverName,serverData] of Object.entries(data)){if(!serverData.users||!serverData.users.length)continue;serverData.users.forEach(u=>{const exp=normalizeDate(u.expiry);customers.push([u.id||u.username||'',u.mac||'',exp,u.name||'',serverName]);});}return customers.length>0?customers:null;}catch(e){console.error('Apps Script fetch failed:',e);return null;}}
+
 async function fetchServerData(s){const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${s.gid}`;try{const r=await fetch(url);if(!r.ok)return[];const t=await r.text();const rows=parseCSV(t);if(rows.length<2)return[];const h=rows[0].map(x=>x.toLowerCase().replace(/"/g,'').trim());const cs=[];let idC=-1,macC=-1,expC=-1,nameC=-1;h.forEach((x,i)=>{if((x.includes('customer')&&x.includes('id'))||x==='customer id')idC=i;if(x.includes('mac'))macC=i;if(x.includes('expir')||x.includes('date'))expC=i;if(x.includes('name')&&!x.includes('id'))nameC=i;});if(idC===-1)idC=0;for(let i=1;i<rows.length;i++){const r2=rows[i];if(!r2||r2.length<2)continue;const id=(r2[idC]||'').replace(/"/g,'').trim();const mac=macC>=0?(r2[macC]||'').replace(/"/g,'').trim():'';const exp=expC>=0?normalizeDate(r2[expC]):null;const nm=nameC>=0?(r2[nameC]||'').replace(/"/g,'').trim():'';if(!id&&!mac&&!nm)continue;cs.push([id,mac,exp,nm,s.name]);}return cs;}catch(e){console.error('Error:',s.name,e);return[];}}
 
-async function loadAllData(){const results=await Promise.all(SERVERS.map(s=>fetchServerData(s)));allCustomers=results.flat();document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderTable();}
+async function loadAllData(){
+// Try Apps Script first, fall back to Google Sheets
+allCustomers=await fetchFromAppsScript();
+if(!allCustomers||allCustomers.length===0){console.log('Apps Script empty, falling back to Google Sheets');const results=await Promise.all(SERVERS.map(s=>fetchServerData(s)));allCustomers=results.flat();}
+document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderTable();}
 
 function getStatus(e){
   if(!e||e==='null'||e==='undefined')return'unknown';
@@ -243,4 +251,3 @@ if(sessionStorage.getItem('iptv_auth')==='1')loadAllData();
 </script>
 </body>
 </html>
-
