@@ -160,6 +160,251 @@ function normalizeDate(d){
   if(!d)return null;
   d=d.replace(/"/g,'').trim();
   if(!d||d.toLowerCase()==='n/a'||d==='-'||d==='')return null;
+  // Strip trailing status text merged with date (e.g. "May 23, 20263 months left" or "Jan 23, 2026Expired")
+  d=d.replace(/(\d{4})\s*(?:\d+\s+(?:months?|days?|weeks?|years?)\s+left|Expired|Active|Unknown).*$/i,'$1').trim();
+  // YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
+  // MM/DD/YYYY or M/D/YYYY
+  let m=d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m)return`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+  // DD/MM/YYYY variant
+  const mo={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12',january:'01',february:'02',march:'03',april:'04',june:'06',july:'07',august:'08',september:'09',october:'10',november:'11',december:'12'};
+  // DD-Mon-YY or DD-Mon-YYYY (e.g. 15-Jan-26, 15-Jan-2026)
+  m=d.match(/^(\d{1,2})-(\w{3,9})-(\d{2,4})$/i);
+  if(m){let y=m[3].length===2?(parseInt(m[3])>50?'19'+m[3]:'20'+m[3]):m[3];const mn=mo[m[2].toLowerCase()];if(mn)return`${y}-${mn}-${m[1].padStart(2,'0')}`;}
+  // Mon DD, YYYY or Month DD, YYYY (e.g. Jan 29, 2026 or January 29, 2026)
+  m=d.match(/^(\w{3,9})\s+(\d{1,2}),?\s*(\d{4})$/i);
+  if(m){const mn=mo[m[1].toLowerCase()];if(mn)return`${m[3]}-${mn}-${m[2].padStart(2,'0')}`;}
+  // DD Mon YYYY or DD Month YYYY (e.g. 29 Jan 2026)
+  m=d.match(/^(\d{1,2})\s+(\w{3,9})\s+(\d{4})$/i);
+  if(m){const mn=mo[m[2].toLowerCase()];if(mn)return`${m[3]}-${mn}-${m[1].padStart(2,'0')}`;}
+  // DD Mon YY (e.g. 29 Jan 26)
+  m=d.match(/^(\d{1,2})\s+(\w{3,9})\s+(\d{2})$/i);
+  if(m){let y=parseInt(m[3])>50?'19'+m[3]:'20'+m[3];const mn=mo[m[2].toLowerCase()];if(mn)return`${y}-${mn}-${m[1].padStart(2,'0')}`;}
+  // MM-DD-YYYY
+  m=d.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(m)return`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+  // Try native Date parse as last resort
+  const parsed=new Date(d);
+  if(!isNaN(parsed.getTime())){
+    const yy=parsed.getFullYear();const mm=String(parsed.getMonth()+1).padStart(2,'0');const dd=String(parsed.getDate()).padStart(2,'0');
+    if(yy>2000&&yy<2100)return`${yy}-${mm}-${dd}`;
+  }
+  return null;
+}
+
+function formatDate(isoDate){
+  if(!isoDate)return '\u2014';
+  const d=new Date(isoDate+'T00:00:00');
+  if(isNaN(d.getTime()))return isoDate;
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return`${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+async function fetchServerData(s){const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${s.gid}`;try{const r=await fetch(url);if(!r.ok)return[];const t=await r.text();const rows=parseCSV(t);if(rows.length<2)return[];const h=rows[0].map(x=>x.toLowerCase().replace(/"/g,'').trim());const cs=[];let idC=-1,macC=-1,expC=-1,nameC=-1;h.forEach((x,i)=>{if((x.includes('customer')&&x.includes('id'))||x==='customer id')idC=i;if(x.includes('mac'))macC=i;if(x.includes('expir')||x.includes('date'))expC=i;if(x.includes('name')&&!x.includes('id'))nameC=i;});if(idC===-1)idC=0;for(let i=1;i<rows.length;i++){const r2=rows[i];if(!r2||r2.length<2)continue;const id=(r2[idC]||'').replace(/"/g,'').trim();const mac=macC>=0?(r2[macC]||'').replace(/"/g,'').trim():'';const exp=expC>=0?normalizeDate(r2[expC]):null;const nm=nameC>=0?(r2[nameC]||'').replace(/"/g,'').trim():'';if(!id&&!mac&&!nm)continue;cs.push([id,mac,exp,nm,s.name]);}return cs;}catch(e){console.error('Error:',s.name,e);return[];}}
+
+async function loadAllData(){const results=await Promise.all(SERVERS.map(s=>fetchServerData(s)));allCustomers=results.flat();document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderTable();}
+
+function getStatus(e){
+  if(!e||e==='null'||e==='undefined')return'unknown';
+  const n=new Date();n.setHours(0,0,0,0);
+  const x=new Date(e+'T00:00:00');
+  if(isNaN(x.getTime()))return'unknown';
+  const d=Math.floor((x-n)/(864e5));
+  if(d<0)return'expired';
+  if(d<=7)return'expiring-7';
+  if(d<=14)return'expiring-14';
+  return'active';
+}
+
+function getStatusLabel(st,e){
+  if(st==='unknown')return'Unknown';
+  const n=new Date();n.setHours(0,0,0,0);
+  const x=new Date(e+'T00:00:00');
+  const d=Math.floor((x-n)/(864e5));
+  if(st==='expired')return'Expired';
+  if(st==='expiring-7'||st==='expiring-14')return d===0?'Expires Today':d===1?'Expires Tomorrow':`Expires in ${d}d`;
+  // active
+  if(d<=30)return`${d} days left`;
+  const months=Math.floor(d/30);
+  return months===1?'1 month left':`${months} months left`;
+}
+
+function getServerClass(s){return'server-'+s.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');}
+
+function renderTable(){const search=document.getElementById('searchBox').value.toLowerCase();const sf=document.getElementById('serverFilter').value;let f=allCustomers.filter(c=>{const[id,mac,exp,nm,sv]=c;if(sf&&sv!==sf)return false;const st=getStatus(exp);if(currentFilter==='active'&&st!=='active')return false;if(currentFilter==='7days'&&st!=='expiring-7')return false;if(currentFilter==='14days'&&!['expiring-7','expiring-14'].includes(st))return false;if(currentFilter==='expired'&&st!=='expired')return false;if(search&&!nm.toLowerCase().includes(search)&&!mac.toLowerCase().includes(search)&&!id.toLowerCase().includes(search))return false;return true;});const ci={name:3,mac:1,server:4,expiry:2,status:2,id:0}[currentSort.col]||0;f.sort((a,b)=>{let va=(a[ci]||'').toLowerCase(),vb=(b[ci]||'').toLowerCase();if(currentSort.col==='status'){va=getStatus(a[2]);vb=getStatus(b[2]);}return currentSort.asc?va.localeCompare(vb):vb.localeCompare(va);});const total=allCustomers.length,act=allCustomers.filter(c=>getStatus(c[2])==='active').length,expiring=allCustomers.filter(c=>['expiring-7','expiring-14'].includes(getStatus(c[2]))).length,exp=allCustomers.filter(c=>getStatus(c[2])==='expired').length;document.getElementById('statsBar').innerHTML=`<span class="stat"><span class="dot dot-total"></span>Total: ${total}</span><span class="stat"><span class="dot dot-active"></span>Active: ${act}</span><span class="stat"><span class="dot dot-expiring"></span>Expiring: ${expiring}</span><span class="stat"><span class="dot dot-expired"></span>Expired: ${exp}</span><span class="stat">Showing: ${f.length}</span>`;const tb=document.getElementById('customerTable');if(!f.length){tb.innerHTML='';document.getElementById('noResults').style.display='block';return;}document.getElementById('noResults').style.display='none';tb.innerHTML=f.map(c=>{const[id,mac,exp2,nm,sv]=c;const st=getStatus(exp2);const sl=getStatusLabel(st,exp2);const sc2=st==='active'?'status-active':st==='expired'?'status-expired':st.includes('expiring')?'status-expiring-soon':'';return`<tr><td class="customer-name">${nm||id||'\u2014'}</td><td class="mac">${mac||'\u2014'}</td><td><span class="server-tag ${getServerClass(sv)}">${sv}</span></td><td>${formatDate(exp2)}</td><td><span class="status-badge ${sc2}">${sl}</span></td><td>${id||'\u2014'}</td></tr>`;}).join('');}
+
+function setFilter(f2){currentFilter=f2;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f2));renderTable();}
+function sortTable(col){if(currentSort.col===col)currentSort.asc=!currentSort.asc;else{currentSort.col=col;currentSort.asc=true;}renderTable();}
+document.getElementById('searchBox').addEventListener('input',renderTable);
+document.getElementById('serverFilter').addEventListener('change',renderTable);
+// Start loading if already authenticated
+if(sessionStorage.getItem('iptv_auth')==='1')loadAllData();
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPTV Customer Manager</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+.login-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#0f172a;z-index:9999;display:flex;align-items:center;justify-content:center}
+.login-box{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:40px;width:360px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.login-box h2{color:#38bdf8;font-size:1.4rem;margin-bottom:6px;text-align:center}
+.login-box p{color:#94a3b8;font-size:.85rem;text-align:center;margin-bottom:24px}
+.login-box label{display:block;color:#94a3b8;font-size:.8rem;margin-bottom:4px;margin-top:14px}
+.login-box input[type="text"],.login-box input[type="password"]{width:100%;padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:.9rem;outline:none;transition:border-color .2s}
+.login-box input:focus{border-color:#38bdf8}
+.login-box .login-btn{width:100%;padding:10px;border-radius:8px;border:none;background:#38bdf8;color:#0f172a;font-size:.95rem;font-weight:600;cursor:pointer;margin-top:20px;transition:background .2s}
+.login-box .login-btn:hover{background:#0ea5e9}
+.login-error{color:#f87171;font-size:.8rem;text-align:center;margin-top:10px;display:none}
+.header{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:20px 30px;position:sticky;top:0;z-index:100;display:flex;justify-content:space-between;align-items:center}
+.header-left h1{font-size:1.5rem;font-weight:700;color:#38bdf8;margin-bottom:4px}
+.header-left p{font-size:.85rem;color:#94a3b8}
+.logout-btn{padding:6px 14px;border-radius:8px;border:1px solid #475569;background:#1e293b;color:#94a3b8;font-size:.8rem;cursor:pointer;transition:all .2s}
+.logout-btn:hover{background:#ef4444;color:#fff;border-color:#ef4444}
+.loading{text-align:center;padding:60px 20px;color:#94a3b8;font-size:1rem}
+.loading .spinner{display:inline-block;width:40px;height:40px;border:3px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.controls{padding:16px 30px;background:#1e293b;border-bottom:1px solid #334155;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.search-box{flex:1;min-width:220px;padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:.9rem;outline:none;transition:border-color .2s}
+.search-box:focus{border-color:#38bdf8}
+.search-box::placeholder{color:#64748b}
+.filter-btn{padding:8px 16px;border-radius:8px;border:1px solid #475569;background:#1e293b;color:#94a3b8;font-size:.8rem;cursor:pointer;transition:all .2s;white-space:nowrap}
+.filter-btn:hover,.filter-btn.active{background:#38bdf8;color:#0f172a;border-color:#38bdf8;font-weight:600}
+.filter-btn.expired-btn:hover,.filter-btn.expired-btn.active{background:#ef4444;border-color:#ef4444;color:#fff}
+.server-filter{padding:8px 12px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:.8rem;outline:none;cursor:pointer}
+.stats{padding:12px 30px;background:#1e293b50;display:flex;gap:20px;flex-wrap:wrap;font-size:.8rem;color:#94a3b8;border-bottom:1px solid #334155}
+.stat{display:flex;align-items:center;gap:6px}
+.stat .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot-active{background:#22c55e}.dot-expiring{background:#f59e0b}.dot-expired{background:#ef4444}.dot-total{background:#38bdf8}
+.table-wrap{overflow-x:auto;padding:0 30px 30px}
+table{width:100%;border-collapse:collapse;margin-top:16px;font-size:.85rem}
+thead th{background:#1e293b;color:#94a3b8;font-weight:600;text-transform:uppercase;font-size:.7rem;letter-spacing:.5px;padding:12px 14px;text-align:left;position:sticky;top:0;border-bottom:2px solid #334155;cursor:pointer;user-select:none}
+thead th:hover{color:#38bdf8}
+tbody tr{border-bottom:1px solid #1e293b;transition:background .15s}
+tbody tr:hover{background:#1e293b80}
+tbody td{padding:10px 14px}
+.mac{font-family:'Courier New',monospace;color:#a78bfa;font-size:.82rem}
+.server-tag{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:600;letter-spacing:.3px}
+.status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:.72rem;font-weight:600}
+.status-active{background:#22c55e20;color:#4ade80;border:1px solid #22c55e40}
+.status-expiring-soon{background:#f59e0b20;color:#fbbf24;border:1px solid #f59e0b40}
+.status-expired{background:#ef444420;color:#f87171;border:1px solid #ef444440}
+.customer-name{font-weight:500;color:#f1f5f9}
+.no-results{text-align:center;padding:60px 20px;color:#64748b;font-size:1rem}
+.server-gold-amch{background:#eab30820;color:#fbbf24;border:1px solid #eab30840}
+.server-goldsamche{background:#f9731620;color:#fb923c;border:1px solid #f9731640}
+.server-gold-4k-premium{background:#a855f720;color:#c084fc;border:1px solid #a855f740}
+.server-spice{background:#ec489920;color:#f472b6;border:1px solid #ec489940}
+.server-smart-amble2{background:#14b8a620;color:#2dd4bf;border:1px solid #14b8a640}
+.server-smart-2021{background:#06b6d420;color:#22d3ee;border:1px solid #06b6d440}
+.server-titan{background:#6366f120;color:#818cf8;border:1px solid #6366f140}
+.server-crown{background:#84cc1620;color:#a3e635;border:1px solid #84cc1640}
+.server-stream-4k{background:#f4364620;color:#fb7185;border:1px solid #f4364640}
+footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:1px solid #1e293b}
+@media(max-width:768px){.controls{padding:12px 16px}.table-wrap{padding:0 8px 20px}table{font-size:.78rem}tbody td,thead th{padding:8px 8px}.header{padding:14px 16px}.stats{padding:10px 16px}.login-box{padding:28px 20px}}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h2>&#128225; IPTV Manager</h2>
+    <p>Sign in to access customer data</p>
+    <label for="loginUser">Username</label>
+    <input type="text" id="loginUser" placeholder="Enter username" autocomplete="off">
+    <label for="loginPass">Password</label>
+    <input type="password" id="loginPass" placeholder="Enter password">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="loginError">Invalid username or password</div>
+  </div>
+</div>
+
+<!-- Main App (hidden until login) -->
+<div id="appContainer" style="display:none">
+<div class="header">
+  <div class="header-left">
+    <h1>&#128225; IPTV Customer Manager</h1>
+    <p>Customer database across all servers &mdash; Live from Google Sheets</p>
+  </div>
+  <button class="logout-btn" onclick="doLogout()">Logout</button>
+</div>
+<div class="controls" style="display:none" id="controlsBar">
+  <input type="text" class="search-box" id="searchBox" placeholder="Search by name, MAC address, or customer ID...">
+  <select class="server-filter" id="serverFilter"><option value="">All Servers</option></select>
+  <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
+  <button class="filter-btn" data-filter="active" onclick="setFilter('active')">Active</button>
+  <button class="filter-btn" data-filter="7days" onclick="setFilter('7days')">Expiring 7 Days</button>
+  <button class="filter-btn" data-filter="14days" onclick="setFilter('14days')">Expiring 14 Days</button>
+  <button class="filter-btn expired-btn" data-filter="expired" onclick="setFilter('expired')">Expired</button>
+</div>
+<div class="stats" id="statsBar" style="display:none"></div>
+<div id="loadingDiv" class="loading"><div class="spinner"></div><br>Loading customer data from Google Sheets...</div>
+<div class="table-wrap">
+  <table style="display:none" id="mainTable">
+    <thead><tr>
+      <th onclick="sortTable('name')">Customer Name &#9660;</th>
+      <th onclick="sortTable('mac')">MAC Address &#9660;</th>
+      <th onclick="sortTable('server')">Server &#9660;</th>
+      <th onclick="sortTable('expiry')">Expiry Date &#9660;</th>
+      <th onclick="sortTable('status')">Status &#9660;</th>
+      <th onclick="sortTable('id')">Customer ID &#9660;</th>
+    </tr></thead>
+    <tbody id="customerTable"></tbody>
+  </table>
+  <div class="no-results" id="noResults" style="display:none">No customers found matching your search.</div>
+</div>
+<footer>IPTV Customer Manager &mdash; Live data from Google Sheets &mdash; Auto-refreshes on page load</footer>
+</div>
+
+<script>
+// Auth
+const _u='amcheema',_p='Che872ac10';
+function doLogin(){
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPass').value;
+  if(u===_u&&p===_p){
+    sessionStorage.setItem('iptv_auth','1');
+    document.getElementById('loginOverlay').style.display='none';
+    document.getElementById('appContainer').style.display='block';
+    loadAllData();
+  } else {
+    document.getElementById('loginError').style.display='block';
+  }
+}
+function doLogout(){
+  sessionStorage.removeItem('iptv_auth');
+  document.getElementById('appContainer').style.display='none';
+  document.getElementById('loginOverlay').style.display='flex';
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginError').style.display='none';
+}
+document.getElementById('loginPass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+document.getElementById('loginUser').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('loginPass').focus();});
+// Auto-login if session exists
+if(sessionStorage.getItem('iptv_auth')==='1'){
+  document.getElementById('loginOverlay').style.display='none';
+  document.getElementById('appContainer').style.display='block';
+}
+
+// App
+const SHEET_ID='1uGu7GWmqHKIP6-2Z7LTRdBenBQovyIKS634lj7wUe34';
+const SERVERS=[{name:'Gold AMCH',gid:0},{name:'GoldSamChe',gid:78207741},{name:'Gold 4K Premium',gid:6151580},{name:'Spice',gid:1946979001},{name:'Smart Amble2',gid:950796683},{name:'Smart 2021',gid:1688805080},{name:'Titan',gid:146800598},{name:'Crown',gid:613843388},{name:'Stream 4K',gid:2123429132}];
+let allCustomers=[],currentFilter='all',currentSort={col:'name',asc:true};
+
+function parseCSV(t){const lines=t.split('\n');return lines.map(line=>{const r=[];let c='',q=false;for(let i=0;i<line.length;i++){if(line[i]==='"')q=!q;else if(line[i]===','&&!q){r.push(c.trim());c='';}else c+=line[i];}r.push(c.trim());return r;});}
+
+function normalizeDate(d){
+  if(!d)return null;
+  d=d.replace(/"/g,'').trim();
+  if(!d||d.toLowerCase()==='n/a'||d==='-'||d==='')return null;
   // YYYY-MM-DD
   if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
   // MM/DD/YYYY or M/D/YYYY
