@@ -57,7 +57,7 @@ tbody td{padding:10px 14px}
 .server-gold-4k-premium{background:#a855f720;color:#c084fc;border:1px solid #a855f740}
 .server-spice{background:#ec489920;color:#f472b6;border:1px solid #ec489940}
 .server-smart-amble2{background:#14b8a620;color:#2dd4bf;border:1px solid #14b8a640}
-.server-smart-2021{background:#06b6d420;color:#22d3ee;border:1px solid #06b6d440}
+.server-smart-tv2021{background:#06b6d420;color:#22d3ee;border:1px solid #06b6d440}
 .server-titan{background:#6366f120;color:#818cf8;border:1px solid #6366f140}
 .server-crown{background:#84cc1620;color:#a3e635;border:1px solid #84cc1640}
 .server-stream-4k{background:#f4364620;color:#fb7185;border:1px solid #f4364640}
@@ -153,7 +153,7 @@ if(sessionStorage.getItem('iptv_auth')==='1'){
 const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwSnjCFNWg4_2dE2NGByh6s1umLKk2yd-bm588c6y5gjX8xzyThR6Aoq-T-nDB2O2-F/exec';
 // Fallback: Google Sheets config (used if Apps Script has no data yet)
 const SHEET_ID='1uGu7GWmqHKIP6-2Z7LTRdBenBQovyIKS634lj7wUe34';
-const SERVERS=[{name:'Gold AMCH',gid:0},{name:'GoldSamChe',gid:78207741},{name:'Gold 4K Premium',gid:6151580},{name:'Spice',gid:1946979001},{name:'Smart Amble2',gid:950796683},{name:'Smart 2021',gid:1688805080},{name:'Titan',gid:146800598},{name:'Crown',gid:613843388},{name:'Stream 4K',gid:2123429132}];
+const SERVERS=[{name:'Gold AMCH',gid:0},{name:'GoldSamChe',gid:78207741},{name:'Gold 4K Premium',gid:6151580},{name:'Spice',gid:1946979001},{name:'Smart Amble2',gid:950796683},{name:'Smart tv2021',gid:1688805080},{name:'Titan',gid:146800598},{name:'Crown',gid:613843388},{name:'Stream 4K',gid:2123429132}];
 let allCustomers=[],currentFilter='all',currentSort={col:'name',asc:true};
 
 function parseCSV(t){const lines=t.split('\n');return lines.map(line=>{const r=[];let c='',q=false;for(let i=0;i<line.length;i++){if(line[i]==='"')q=!q;else if(line[i]===','&&!q){r.push(c.trim());c='';}else c+=line[i];}r.push(c.trim());return r;});}
