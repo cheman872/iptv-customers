@@ -42,10 +42,12 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172
 .credits-grid{display:flex;gap:10px;flex-wrap:wrap}
 .credit-card{padding:8px 14px;border-radius:10px;border:1px solid #334155;background:#0f172a;min-width:120px;display:flex;flex-direction:column;gap:2px}
 .credit-card .cc-server{font-size:.72rem;color:#94a3b8;font-weight:500}
-.credit-card .cc-count{font-size:1.1rem;font-weight:700;color:#38bdf8}
-.credit-card .cc-users{font-size:.68rem;color:#64748b}
+.credit-card .cc-count{font-size:.7rem;color:#64748b}
+.credit-card .cc-users{font-size:1.1rem;font-weight:700;color:#38bdf8}
 .credit-card.cc-low .cc-count{color:#f87171}
+.credit-card.cc-low .cc-users{color:#f87171}
 .credit-card.cc-warn .cc-count{color:#fbbf24}
+.credit-card.cc-warn .cc-users{color:#fbbf24}
 .table-wrap{overflow-x:auto;padding:0 30px 30px}
 table{width:100%;border-collapse:collapse;margin-top:16px;font-size:.85rem}
 thead th{background:#1e293b;color:#94a3b8;font-weight:600;text-transform:uppercase;font-size:.7rem;letter-spacing:.5px;padding:12px 14px;text-align:left;position:sticky;top:0;border-bottom:2px solid #334155;cursor:pointer;user-select:none}
@@ -242,7 +244,7 @@ const credits=meta.credits!=null?meta.credits:'—';
 const numCredits=parseInt(credits,10);
 const cls=!isNaN(numCredits)&&numCredits<=5?'cc-low':!isNaN(numCredits)&&numCredits<=20?'cc-warn':'';
 const serverCls=getServerClass(name);
-return`<div class="credit-card ${cls}"><span class="cc-server"><span class="server-tag ${serverCls}">${name}</span></span><span class="cc-count">${credits}</span><span class="cc-users">${meta.users} users</span></div>`;
+return`<div class="credit-card ${cls}"><span class="cc-server"><span class="server-tag ${serverCls}">${name}</span></span><span class="cc-users">${meta.users} users</span><span class="cc-count">${credits} credits</span></div>`;
 }).join('');}
 
 function getStatus(e){
