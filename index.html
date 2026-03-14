@@ -37,6 +37,15 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172
 .stat{display:flex;align-items:center;gap:6px}
 .stat .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 .dot-active{background:#22c55e}.dot-expiring{background:#f59e0b}.dot-expired{background:#ef4444}.dot-total{background:#38bdf8}
+.credits-bar{padding:14px 30px;background:linear-gradient(135deg,#1e293b 0%,#162032 100%);border-bottom:1px solid #334155;display:none}
+.credits-bar h3{font-size:.8rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:600}
+.credits-grid{display:flex;gap:10px;flex-wrap:wrap}
+.credit-card{padding:8px 14px;border-radius:10px;border:1px solid #334155;background:#0f172a;min-width:120px;display:flex;flex-direction:column;gap:2px}
+.credit-card .cc-server{font-size:.72rem;color:#94a3b8;font-weight:500}
+.credit-card .cc-count{font-size:1.1rem;font-weight:700;color:#38bdf8}
+.credit-card .cc-users{font-size:.68rem;color:#64748b}
+.credit-card.cc-low .cc-count{color:#f87171}
+.credit-card.cc-warn .cc-count{color:#fbbf24}
 .table-wrap{overflow-x:auto;padding:0 30px 30px}
 table{width:100%;border-collapse:collapse;margin-top:16px;font-size:.85rem}
 thead th{background:#1e293b;color:#94a3b8;font-weight:600;text-transform:uppercase;font-size:.7rem;letter-spacing:.5px;padding:12px 14px;text-align:left;position:sticky;top:0;border-bottom:2px solid #334155;cursor:pointer;user-select:none}
@@ -100,6 +109,10 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
   <button class="filter-btn expired-btn" data-filter="expired" onclick="setFilter('expired')">Expired</button>
 </div>
 <div class="stats" id="statsBar" style="display:none"></div>
+<div class="credits-bar" id="creditsBar">
+  <h3>Credits Remaining</h3>
+  <div class="credits-grid" id="creditsGrid"></div>
+</div>
 <div id="loadingDiv" class="loading"><div class="spinner"></div><br>Loading customer data...</div>
 <div class="table-wrap">
   <table style="display:none" id="mainTable">
@@ -203,15 +216,34 @@ function formatDate(isoDate){
   return`${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-async function fetchFromAppsScript(){try{const r=await fetch(APPS_SCRIPT_URL+'?action=getAll');if(!r.ok)return null;const data=await r.json();let customers=[];for(const[serverName,serverData] of Object.entries(data)){if(!serverData.users||!serverData.users.length)continue;serverData.users.forEach(u=>{const exp=normalizeDate(u.expiry);customers.push([u.id||u.username||'',u.mac||'',exp,u.name||u.description||'',serverName]);});}return customers.length>0?customers:null;}catch(e){console.error('Apps Script fetch failed:',e);return null;}}
+let serverMeta={};
+async function fetchFromAppsScript(){try{const r=await fetch(APPS_SCRIPT_URL+'?action=getAll');if(!r.ok)return null;const data=await r.json();let customers=[];for(const[serverName,serverData] of Object.entries(data)){serverMeta[serverName]={users:serverData.users?serverData.users.length:0,credits:serverData.credits||null,lastUpdated:serverData.lastUpdated||null};if(!serverData.users||!serverData.users.length)continue;serverData.users.forEach(u=>{const exp=normalizeDate(u.expiry);customers.push([u.id||u.username||'',u.mac||'',exp,u.name||u.description||'',serverName]);});}return customers.length>0?customers:null;}catch(e){console.error('Apps Script fetch failed:',e);return null;}}
 
 async function fetchServerData(s){const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${s.gid}`;try{const r=await fetch(url);if(!r.ok)return[];const t=await r.text();const rows=parseCSV(t);if(rows.length<2)return[];const h=rows[0].map(x=>x.toLowerCase().replace(/"/g,'').trim());const cs=[];let idC=-1,macC=-1,expC=-1,nameC=-1,descC=-1;h.forEach((x,i)=>{if((x.includes('customer')&&x.includes('id'))||x==='customer id')idC=i;if(x.includes('mac'))macC=i;if(x.includes('expir')||x.includes('date'))expC=i;if(x.includes('name')&&!x.includes('id'))nameC=i;if(x.includes('desc'))descC=i;});if(nameC===-1&&descC!==-1)nameC=descC;if(idC===-1)idC=0;for(let i=1;i<rows.length;i++){const r2=rows[i];if(!r2||r2.length<2)continue;const id=(r2[idC]||'').replace(/"/g,'').trim();const mac=macC>=0?(r2[macC]||'').replace(/"/g,'').trim():'';const exp=expC>=0?normalizeDate(r2[expC]):null;const nm=nameC>=0?(r2[nameC]||'').replace(/"/g,'').trim():'';if(!id&&!mac&&!nm)continue;cs.push([id,mac,exp,nm,s.name]);}return cs;}catch(e){console.error('Error:',s.name,e);return[];}}
+
+async function fetchCredits(){
+try{const r=await fetch('https://cheman872.github.io/iptv-customers/credits.json?t='+Date.now());if(!r.ok)return;const data=await r.json();for(const[server,info] of Object.entries(data)){if(!serverMeta[server])serverMeta[server]={users:0,credits:null,lastUpdated:null};serverMeta[server].credits=info.credits;}}catch(e){console.log('Credits fetch failed:',e);}}
 
 async function loadAllData(){
 // Try Apps Script first, fall back to Google Sheets
 allCustomers=await fetchFromAppsScript();
 if(!allCustomers||allCustomers.length===0){console.log('Apps Script empty, falling back to Google Sheets');const results=await Promise.all(SERVERS.map(s=>fetchServerData(s)));allCustomers=results.flat();}
-document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderTable();}
+await fetchCredits();
+document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderCredits();renderTable();}
+
+function renderCredits(){
+const grid=document.getElementById('creditsGrid');
+const bar=document.getElementById('creditsBar');
+const servers=Object.entries(serverMeta).sort((a,b)=>a[0].localeCompare(b[0]));
+if(!servers.length){bar.style.display='none';return;}
+bar.style.display='block';
+grid.innerHTML=servers.map(([name,meta])=>{
+const credits=meta.credits!=null?meta.credits:'—';
+const numCredits=parseInt(credits,10);
+const cls=!isNaN(numCredits)&&numCredits<=5?'cc-low':!isNaN(numCredits)&&numCredits<=20?'cc-warn':'';
+const serverCls=getServerClass(name);
+return`<div class="credit-card ${cls}"><span class="cc-server"><span class="server-tag ${serverCls}">${name}</span></span><span class="cc-count">${credits}</span><span class="cc-users">${meta.users} users</span></div>`;
+}).join('');}
 
 function getStatus(e){
   if(!e||e==='null'||e==='undefined')return'unknown';
