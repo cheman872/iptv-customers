@@ -244,7 +244,10 @@ const credits=meta.credits!=null?meta.credits:'—';
 const numCredits=parseInt(credits,10);
 const cls=!isNaN(numCredits)&&numCredits<=5?'cc-low':!isNaN(numCredits)&&numCredits<=20?'cc-warn':'';
 const serverCls=getServerClass(name);
-return`<div class="credit-card ${cls}"><span class="cc-server"><span class="server-tag ${serverCls}">${name}</span></span><span class="cc-users">${meta.users} users</span><span class="cc-count">${credits} credits</span></div>`;
+const serverCustomers=allCustomers.filter(c=>c[4]===name);
+const activeCount=serverCustomers.filter(c=>getStatus(c[2])==='active').length;
+const totalCount=serverCustomers.length;
+return`<div class="credit-card ${cls}"><span class="cc-server"><span class="server-tag ${serverCls}">${name}</span></span><span class="cc-users">${activeCount} active</span><span class="cc-count">${totalCount} total · ${credits} credits</span></div>`;
 }).join('');}
 
 function getStatus(e){
