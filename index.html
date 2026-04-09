@@ -72,6 +72,23 @@ tbody td{padding:10px 14px}
 .server-titan{background:#6366f120;color:#818cf8;border:1px solid #6366f140}
 .server-crown{background:#84cc1620;color:#a3e635;border:1px solid #84cc1640}
 .server-stream-4k{background:#f4364620;color:#fb7185;border:1px solid #f4364640}
+.phone-cell{cursor:pointer;color:#94a3b8;font-size:.82rem;white-space:nowrap}
+.phone-cell:hover{color:#38bdf8}
+.phone-cell .phone-num{color:#2dd4bf;font-family:'Courier New',monospace}
+.phone-cell .phone-add{color:#475569;font-style:italic;font-size:.75rem}
+.phone-cell .phone-add:hover{color:#38bdf8}
+.phone-edit-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center}
+.phone-edit-box{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;width:340px;max-width:90vw;box-shadow:0 10px 40px rgba(0,0,0,0.5)}
+.phone-edit-box h3{color:#38bdf8;font-size:1rem;margin-bottom:4px}
+.phone-edit-box .pe-name{color:#94a3b8;font-size:.8rem;margin-bottom:16px}
+.phone-edit-box input{width:100%;padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:.95rem;outline:none;margin-bottom:14px}
+.phone-edit-box input:focus{border-color:#38bdf8}
+.phone-edit-box .pe-btns{display:flex;gap:8px}
+.phone-edit-box .pe-btns button{flex:1;padding:8px;border-radius:8px;border:none;font-size:.85rem;font-weight:600;cursor:pointer}
+.pe-save{background:#38bdf8;color:#0f172a}.pe-save:hover{background:#0ea5e9}
+.pe-cancel{background:#334155;color:#94a3b8}.pe-cancel:hover{background:#475569}
+.pe-delete{background:#ef444430;color:#f87171;border:1px solid #ef444440!important}.pe-delete:hover{background:#ef4444;color:#fff}
+.save-indicator{position:fixed;bottom:20px;right:20px;background:#22c55e;color:#0f172a;padding:10px 20px;border-radius:8px;font-size:.85rem;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s}
 footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:1px solid #1e293b}
 @media(max-width:768px){.controls{padding:12px 16px}.table-wrap{padding:0 8px 20px}table{font-size:.78rem}tbody td,thead th{padding:8px 8px}.header{padding:14px 16px}.stats{padding:10px 16px}.login-box{padding:28px 20px}}
 </style>
@@ -92,6 +109,22 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
   </div>
 </div>
 
+<!-- Phone Edit Modal -->
+<div class="phone-edit-overlay" id="phoneEditOverlay" style="display:none" onclick="if(event.target===this)closePhoneEdit()">
+  <div class="phone-edit-box">
+    <h3>Phone Number</h3>
+    <div class="pe-name" id="peCustomerName"></div>
+    <input type="tel" id="pePhoneInput" placeholder="e.g. +16041234567" onkeydown="if(event.key==='Enter')savePhone()">
+    <div class="pe-btns">
+      <button class="pe-cancel" onclick="closePhoneEdit()">Cancel</button>
+      <button class="pe-delete" id="peDeleteBtn" onclick="deletePhone()" style="display:none">Remove</button>
+      <button class="pe-save" onclick="savePhone()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="save-indicator" id="saveIndicator">Saved</div>
+
 <!-- Main App (hidden until login) -->
 <div id="appContainer" style="display:none">
 <div class="header">
@@ -102,7 +135,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
   <button class="logout-btn" onclick="doLogout()">Logout</button>
 </div>
 <div class="controls" style="display:none" id="controlsBar">
-  <input type="text" class="search-box" id="searchBox" placeholder="Search by name, MAC address, or customer ID...">
+  <input type="text" class="search-box" id="searchBox" placeholder="Search by name, MAC, ID, or phone number...">
   <select class="server-filter" id="serverFilter"><option value="">All Servers</option></select>
   <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
   <button class="filter-btn" data-filter="active" onclick="setFilter('active')">Active</button>
@@ -121,6 +154,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
     <thead><tr>
       <th>#</th>
       <th onclick="sortTable('name')">Customer Name &#9660;</th>
+      <th>Phone</th>
       <th onclick="sortTable('mac')">MAC Address &#9660;</th>
       <th onclick="sortTable('server')">Server &#9660;</th>
       <th onclick="sortTable('expiry')">Expiry Date &#9660;</th>
@@ -159,7 +193,6 @@ function doLogout(){
 }
 document.getElementById('loginPass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('loginUser').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('loginPass').focus();});
-// Auto-login if session exists
 if(sessionStorage.getItem('iptv_auth')==='1'){
   document.getElementById('loginOverlay').style.display='none';
   document.getElementById('appContainer').style.display='block';
@@ -167,10 +200,76 @@ if(sessionStorage.getItem('iptv_auth')==='1'){
 
 // App
 const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwSnjCFNWg4_2dE2NGByh6s1umLKk2yd-bm588c6y5gjX8xzyThR6Aoq-T-nDB2O2-F/exec';
-// Fallback: Google Sheets config (used if Apps Script has no data yet)
 const SHEET_ID='1uGu7GWmqHKIP6-2Z7LTRdBenBQovyIKS634lj7wUe34';
 const SERVERS=[{name:'Gold AMCH',gid:0},{name:'GoldSamChe',gid:78207741},{name:'Gold 4K Premium',gid:6151580},{name:'Spice',gid:1946979001},{name:'Smart Amble2',gid:950796683},{name:'Smart 2021',gid:1688805080},{name:'Titan',gid:146800598},{name:'Crown',gid:613843388},{name:'Stream 4K',gid:2123429132}];
 let allCustomers=[],currentFilter='all',currentSort={col:'name',asc:true};
+
+// Phone data
+let phoneData={};
+let editingPhoneKey=null;
+
+function getPhoneKey(server,mac,id,name){return server+'|'+(mac||id||name);}
+
+function getPhone(server,mac,id,name){
+  const key=getPhoneKey(server,mac,id,name);
+  // Check localStorage overrides first, then remote data
+  const local=localStorage.getItem('iptv_phone_'+key);
+  if(local)return local;
+  const remote=phoneData[key];
+  return remote?remote.phone:null;
+}
+
+function formatPhone(phone){
+  if(!phone)return null;
+  // Format: +1XXXXXXXXXX -> +1 (XXX) XXX-XXXX
+  const clean=phone.replace(/[^\d+]/g,'');
+  const m=clean.match(/^\+?1?(\d{3})(\d{3})(\d{4})$/);
+  if(m)return`+1 (${m[1]}) ${m[2]}-${m[3]}`;
+  return phone;
+}
+
+function openPhoneEdit(server,mac,id,name){
+  editingPhoneKey=getPhoneKey(server,mac,id,name);
+  const current=getPhone(server,mac,id,name);
+  document.getElementById('peCustomerName').textContent=name+' — '+server;
+  document.getElementById('pePhoneInput').value=current||'';
+  document.getElementById('peDeleteBtn').style.display=current?'block':'none';
+  document.getElementById('phoneEditOverlay').style.display='flex';
+  setTimeout(()=>document.getElementById('pePhoneInput').focus(),100);
+}
+
+function closePhoneEdit(){
+  document.getElementById('phoneEditOverlay').style.display='none';
+  editingPhoneKey=null;
+}
+
+function savePhone(){
+  const phone=document.getElementById('pePhoneInput').value.trim();
+  if(!phone||!editingPhoneKey){closePhoneEdit();return;}
+  // Clean the number
+  let clean=phone.replace(/[\s\-\(\)\.]/g,'');
+  if(/^\d{10}$/.test(clean))clean='+1'+clean;
+  if(/^1\d{10}$/.test(clean))clean='+'+clean;
+  localStorage.setItem('iptv_phone_'+editingPhoneKey,clean);
+  showSaveIndicator('Saved');
+  closePhoneEdit();
+  renderTable();
+}
+
+function deletePhone(){
+  if(!editingPhoneKey)return;
+  localStorage.removeItem('iptv_phone_'+editingPhoneKey);
+  showSaveIndicator('Removed');
+  closePhoneEdit();
+  renderTable();
+}
+
+function showSaveIndicator(msg){
+  const el=document.getElementById('saveIndicator');
+  el.textContent=msg||'Saved';
+  el.style.opacity='1';
+  setTimeout(()=>{el.style.opacity='0';},1500);
+}
 
 function parseCSV(t){const lines=t.split('\n');return lines.map(line=>{const r=[];let c='',q=false;for(let i=0;i<line.length;i++){if(line[i]==='"')q=!q;else if(line[i]===','&&!q){r.push(c.trim());c='';}else c+=line[i];}r.push(c.trim());return r;});}
 
@@ -178,32 +277,22 @@ function normalizeDate(d){
   if(!d)return null;
   d=d.replace(/"/g,'').trim();
   if(!d||d.toLowerCase()==='n/a'||d==='-'||d==='')return null;
-  // Strip trailing junk: "+1" suffixes (e.g. "2026-04-28 +1"), status text merged with date (e.g. "May 23, 20263 months left", "Jan 23, 2026Expired")
   d=d.replace(/\s+[+-]\d+\s*$/,'').trim();
   d=d.replace(/(\d{4})\s*(?:\d+\s+(?:months?|days?|weeks?|years?)\s+left|Expired|Active|Unknown).*$/i,'$1').trim();
-  // YYYY-MM-DD
   if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
-  // MM/DD/YYYY or M/D/YYYY
   let m=d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if(m)return`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
-  // DD/MM/YYYY variant
   const mo={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12',january:'01',february:'02',march:'03',april:'04',june:'06',july:'07',august:'08',september:'09',october:'10',november:'11',december:'12'};
-  // DD-Mon-YY or DD-Mon-YYYY (e.g. 15-Jan-26, 15-Jan-2026)
   m=d.match(/^(\d{1,2})-(\w{3,9})-(\d{2,4})$/i);
   if(m){let y=m[3].length===2?(parseInt(m[3])>50?'19'+m[3]:'20'+m[3]):m[3];const mn=mo[m[2].toLowerCase()];if(mn)return`${y}-${mn}-${m[1].padStart(2,'0')}`;}
-  // Mon DD, YYYY or Month DD, YYYY (e.g. Jan 29, 2026 or January 29, 2026)
   m=d.match(/^(\w{3,9})\s+(\d{1,2}),?\s*(\d{4})$/i);
   if(m){const mn=mo[m[1].toLowerCase()];if(mn)return`${m[3]}-${mn}-${m[2].padStart(2,'0')}`;}
-  // DD Mon YYYY or DD Month YYYY (e.g. 29 Jan 2026)
   m=d.match(/^(\d{1,2})\s+(\w{3,9})\s+(\d{4})$/i);
   if(m){const mn=mo[m[2].toLowerCase()];if(mn)return`${m[3]}-${mn}-${m[1].padStart(2,'0')}`;}
-  // DD Mon YY (e.g. 29 Jan 26)
   m=d.match(/^(\d{1,2})\s+(\w{3,9})\s+(\d{2})$/i);
   if(m){let y=parseInt(m[3])>50?'19'+m[3]:'20'+m[3];const mn=mo[m[2].toLowerCase()];if(mn)return`${y}-${mn}-${m[1].padStart(2,'0')}`;}
-  // MM-DD-YYYY
   m=d.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if(m)return`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
-  // Try native Date parse as last resort
   const parsed=new Date(d);
   if(!isNaN(parsed.getTime())){
     const yy=parsed.getFullYear();const mm=String(parsed.getMonth()+1).padStart(2,'0');const dd=String(parsed.getDate()).padStart(2,'0');
@@ -228,11 +317,13 @@ async function fetchServerData(s){const url=`https://docs.google.com/spreadsheet
 async function fetchCredits(){
 try{const r=await fetch('https://cheman872.github.io/iptv-customers/credits.json?t='+Date.now());if(!r.ok)return;const data=await r.json();for(const[server,info] of Object.entries(data)){if(!serverMeta[server])serverMeta[server]={users:0,credits:null,lastUpdated:null};serverMeta[server].credits=info.credits;}}catch(e){console.log('Credits fetch failed:',e);}}
 
+async function fetchPhones(){
+try{const r=await fetch('https://cheman872.github.io/iptv-customers/phones.json?t='+Date.now());if(!r.ok)return;phoneData=await r.json();}catch(e){console.log('Phones fetch failed:',e);}}
+
 async function loadAllData(){
-// Try Apps Script first, fall back to Google Sheets
 allCustomers=await fetchFromAppsScript();
 if(!allCustomers||allCustomers.length===0){console.log('Apps Script empty, falling back to Google Sheets');const results=await Promise.all(SERVERS.map(s=>fetchServerData(s)));allCustomers=results.flat();}
-await fetchCredits();
+await Promise.all([fetchCredits(),fetchPhones()]);
 document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderCredits();renderTable();}
 
 function renderCredits(){
@@ -242,14 +333,14 @@ const servers=Object.entries(serverMeta).sort((a,b)=>a[0].localeCompare(b[0]));
 if(!servers.length){bar.style.display='none';return;}
 bar.style.display='block';
 grid.innerHTML=servers.map(([name,meta])=>{
-const credits=meta.credits!=null?meta.credits:'—';
+const credits=meta.credits!=null?meta.credits:'\u2014';
 const numCredits=parseInt(credits,10);
 const cls=!isNaN(numCredits)&&numCredits<=5?'cc-low':!isNaN(numCredits)&&numCredits<=20?'cc-warn':'';
 const serverCls=getServerClass(name);
 const serverCustomers=allCustomers.filter(c=>c[4]===name);
 const activeCount=serverCustomers.filter(c=>{const st=getStatus(c[2]);return st==='active'||st==='expiring-7'||st==='expiring-14';}).length;
 const totalCount=serverCustomers.length;
-return`<div class="credit-card ${cls}"><span class="cc-server"><span class="server-tag ${serverCls}">${name}</span></span><span class="cc-users">${activeCount} active</span><span class="cc-count">${totalCount} total · ${credits} credits</span></div>`;
+return`<div class="credit-card ${cls}"><span class="cc-server"><span class="server-tag ${serverCls}">${name}</span></span><span class="cc-users">${activeCount} active</span><span class="cc-count">${totalCount} total \u00B7 ${credits} credits</span></div>`;
 }).join('');}
 
 function getStatus(e){
@@ -271,7 +362,6 @@ function getStatusLabel(st,e){
   const d=Math.floor((x-n)/(864e5));
   if(st==='expired')return'Expired';
   if(st==='expiring-7'||st==='expiring-14')return d===0?'Expires Today':d===1?'Expires Tomorrow':`Expires in ${d}d`;
-  // active
   if(d<=30)return`${d} days left`;
   const months=Math.floor(d/30);
   return months===1?'1 month left':`${months} months left`;
@@ -279,13 +369,58 @@ function getStatusLabel(st,e){
 
 function getServerClass(s){return'server-'+s.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');}
 
-function renderTable(){const search=document.getElementById('searchBox').value.toLowerCase();const sf=document.getElementById('serverFilter').value;let f=allCustomers.filter(c=>{const[id,mac,exp,nm,sv]=c;if(sf&&sv!==sf)return false;const st=getStatus(exp);if(currentFilter==='active'&&st!=='active')return false;if(currentFilter==='7days'&&st!=='expiring-7')return false;if(currentFilter==='14days'&&!['expiring-7','expiring-14'].includes(st))return false;if(currentFilter==='expired'&&st!=='expired')return false;if(search&&!nm.toLowerCase().includes(search)&&!mac.toLowerCase().includes(search)&&!id.toLowerCase().includes(search))return false;return true;});const ci={name:3,mac:1,server:4,expiry:2,status:2,id:0}[currentSort.col]||0;f.sort((a,b)=>{let va=(a[ci]||'').toLowerCase(),vb=(b[ci]||'').toLowerCase();if(currentSort.col==='status'){va=getStatus(a[2]);vb=getStatus(b[2]);}return currentSort.asc?va.localeCompare(vb):vb.localeCompare(va);});const statsBase=sf?allCustomers.filter(c=>c[4]===sf):allCustomers;const total=statsBase.length,act=statsBase.filter(c=>getStatus(c[2])==='active').length,expiring=statsBase.filter(c=>['expiring-7','expiring-14'].includes(getStatus(c[2]))).length,exp=statsBase.filter(c=>getStatus(c[2])==='expired').length;document.getElementById('statsBar').innerHTML=`<span class="stat"><span class="dot dot-total"></span>Total: ${total}</span><span class="stat"><span class="dot dot-active"></span>Active: ${act}</span><span class="stat"><span class="dot dot-expiring"></span>Expiring: ${expiring}</span><span class="stat"><span class="dot dot-expired"></span>Expired: ${exp}</span><span class="stat">Showing: ${f.length}</span>`;const tb=document.getElementById('customerTable');if(!f.length){tb.innerHTML='';document.getElementById('noResults').style.display='block';return;}document.getElementById('noResults').style.display='none';tb.innerHTML=f.map((c,i)=>{const[id,mac,exp2,nm,sv]=c;const st=getStatus(exp2);const sl=getStatusLabel(st,exp2);const sc2=st==='active'?'status-active':st==='expired'?'status-expired':st.includes('expiring')?'status-expiring-soon':'';return`<tr><td style="color:#64748b;font-size:.78rem">${i+1}</td><td class="customer-name">${nm||id||'\u2014'}</td><td class="mac">${mac||'\u2014'}</td><td><span class="server-tag ${getServerClass(sv)}">${sv}</span></td><td>${formatDate(exp2)}</td><td><span class="status-badge ${sc2}">${sl}</span></td><td>${id||'\u2014'}</td></tr>`;}).join('');}
+function renderTable(){
+const search=document.getElementById('searchBox').value.toLowerCase();
+const sf=document.getElementById('serverFilter').value;
+let f=allCustomers.filter(c=>{
+  const[id,mac,exp,nm,sv]=c;
+  if(sf&&sv!==sf)return false;
+  const st=getStatus(exp);
+  if(currentFilter==='active'&&st!=='active')return false;
+  if(currentFilter==='7days'&&st!=='expiring-7')return false;
+  if(currentFilter==='14days'&&!['expiring-7','expiring-14'].includes(st))return false;
+  if(currentFilter==='expired'&&st!=='expired')return false;
+  if(search){
+    const phone=getPhone(sv,mac,id,nm)||'';
+    if(!nm.toLowerCase().includes(search)&&!mac.toLowerCase().includes(search)&&!id.toLowerCase().includes(search)&&!phone.toLowerCase().includes(search))return false;
+  }
+  return true;
+});
+const ci={name:3,mac:1,server:4,expiry:2,status:2,id:0}[currentSort.col]||0;
+f.sort((a,b)=>{let va=(a[ci]||'').toLowerCase(),vb=(b[ci]||'').toLowerCase();if(currentSort.col==='status'){va=getStatus(a[2]);vb=getStatus(b[2]);}return currentSort.asc?va.localeCompare(vb):vb.localeCompare(va);});
+const statsBase=sf?allCustomers.filter(c=>c[4]===sf):allCustomers;
+const total=statsBase.length,act=statsBase.filter(c=>getStatus(c[2])==='active').length,expiring=statsBase.filter(c=>['expiring-7','expiring-14'].includes(getStatus(c[2]))).length,exp=statsBase.filter(c=>getStatus(c[2])==='expired').length;
+document.getElementById('statsBar').innerHTML=`<span class="stat"><span class="dot dot-total"></span>Total: ${total}</span><span class="stat"><span class="dot dot-active"></span>Active: ${act}</span><span class="stat"><span class="dot dot-expiring"></span>Expiring: ${expiring}</span><span class="stat"><span class="dot dot-expired"></span>Expired: ${exp}</span><span class="stat">Showing: ${f.length}</span>`;
+const tb=document.getElementById('customerTable');
+if(!f.length){tb.innerHTML='';document.getElementById('noResults').style.display='block';return;}
+document.getElementById('noResults').style.display='none';
+tb.innerHTML=f.map((c,i)=>{
+  const[id,mac,exp2,nm,sv]=c;
+  const st=getStatus(exp2);
+  const sl=getStatusLabel(st,exp2);
+  const sc2=st==='active'?'status-active':st==='expired'?'status-expired':st.includes('expiring')?'status-expiring-soon':'';
+  const phone=getPhone(sv,mac,id,nm);
+  const phoneHtml=phone
+    ?`<span class="phone-num">${formatPhone(phone)}</span>`
+    :`<span class="phone-add">+ add</span>`;
+  const safeNm=(nm||'').replace(/'/g,"\\'");
+  return`<tr>
+    <td style="color:#64748b;font-size:.78rem">${i+1}</td>
+    <td class="customer-name">${nm||id||'\u2014'}</td>
+    <td class="phone-cell" onclick="openPhoneEdit('${sv.replace(/'/g,"\\'")}','${(mac||'').replace(/'/g,"\\'")}','${(id||'').replace(/'/g,"\\'")}','${safeNm}')">${phoneHtml}</td>
+    <td class="mac">${mac||'\u2014'}</td>
+    <td><span class="server-tag ${getServerClass(sv)}">${sv}</span></td>
+    <td>${formatDate(exp2)}</td>
+    <td><span class="status-badge ${sc2}">${sl}</span></td>
+    <td>${id||'\u2014'}</td>
+  </tr>`;
+}).join('');
+}
 
 function setFilter(f2){currentFilter=f2;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f2));renderTable();}
 function sortTable(col){if(currentSort.col===col)currentSort.asc=!currentSort.asc;else{currentSort.col=col;currentSort.asc=true;}renderTable();}
 document.getElementById('searchBox').addEventListener('input',renderTable);
 document.getElementById('serverFilter').addEventListener('change',renderTable);
-// Start loading if already authenticated
 if(sessionStorage.getItem('iptv_auth')==='1')loadAllData();
 </script>
 </body>
