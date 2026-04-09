@@ -90,7 +90,37 @@ tbody td{padding:10px 14px}
 .pe-delete{background:#ef444430;color:#f87171;border:1px solid #ef444440!important}.pe-delete:hover{background:#ef4444;color:#fff}
 .save-indicator{position:fixed;bottom:20px;right:20px;background:#22c55e;color:#0f172a;padding:10px 20px;border-radius:8px;font-size:.85rem;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s}
 footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:1px solid #1e293b}
-@media(max-width:768px){.controls{padding:12px 16px}.table-wrap{padding:0 8px 20px}table{font-size:.78rem}tbody td,thead th{padding:8px 8px}.header{padding:14px 16px}.stats{padding:10px 16px}.login-box{padding:28px 20px}}
+/* Mobile card list (hidden on desktop) */
+.mobile-cards{display:none;padding:12px}
+.m-card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:14px 16px;margin-bottom:10px}
+.m-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.m-card-name{font-weight:600;color:#f1f5f9;font-size:.95rem;flex:1}
+.m-card-num{color:#64748b;font-size:.72rem;min-width:24px;text-align:right}
+.m-card-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.m-card-label{color:#64748b;font-size:.72rem;text-transform:uppercase;letter-spacing:.3px}
+.m-card-val{color:#cbd5e1;font-size:.82rem;text-align:right}
+.m-card-phone{margin-top:8px;padding-top:8px;border-top:1px solid #334155}
+.m-card-phone .phone-num{color:#2dd4bf;font-family:'Courier New',monospace;font-size:.9rem}
+.m-card-phone .phone-add{color:#475569;font-style:italic;font-size:.82rem}
+.m-card .mac{font-size:.75rem}
+@media(max-width:768px){
+  .controls{padding:12px 16px}
+  .header{padding:14px 16px}
+  .header-left h1{font-size:1.1rem}
+  .header-left p{font-size:.75rem}
+  .stats{padding:10px 16px;gap:12px}
+  .login-box{padding:28px 20px}
+  .credits-bar{padding:10px 16px}
+  .credits-grid{gap:6px}
+  .credit-card{min-width:100px;padding:6px 10px}
+  .credit-card .cc-users{font-size:.95rem}
+  .filter-btn{padding:6px 10px;font-size:.72rem}
+  .search-box{min-width:100%;font-size:16px} /* 16px prevents iOS zoom */
+  .server-filter{font-size:.78rem;flex:1}
+  /* Hide table, show cards */
+  .table-wrap{display:none!important}
+  .mobile-cards{display:block}
+}
 </style>
 </head>
 <body>
@@ -168,6 +198,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
   </table>
   <div class="no-results" id="noResults" style="display:none">No customers found matching your search.</div>
 </div>
+<div class="mobile-cards" id="mobileCards"></div>
 <footer>IPTV Customer Manager &mdash; Auto-refreshes on page load</footer>
 </div>
 
@@ -386,7 +417,7 @@ async function loadAllData(){
 allCustomers=await fetchFromAppsScript();
 if(!allCustomers||allCustomers.length===0){console.log('Apps Script empty, falling back to Google Sheets');const results=await Promise.all(SERVERS.map(s=>fetchServerData(s)));allCustomers=results.flat();}
 await Promise.all([fetchCredits(),fetchPhones()]);
-document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderCredits();renderTable();}
+document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';document.getElementById('mobileCards').style.display='';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderCredits();renderTable();}
 
 function renderCredits(){
 const grid=document.getElementById('creditsGrid');
@@ -456,7 +487,7 @@ document.getElementById('statsBar').innerHTML=`<span class="stat"><span class="d
 const tb=document.getElementById('customerTable');
 if(!f.length){tb.innerHTML='';document.getElementById('noResults').style.display='block';return;}
 document.getElementById('noResults').style.display='none';
-tb.innerHTML=f.map((c,i)=>{
+const rows=f.map((c,i)=>{
   const[id,mac,exp2,nm,sv]=c;
   const st=getStatus(exp2);
   const sl=getStatusLabel(st,exp2);
@@ -466,17 +497,30 @@ tb.innerHTML=f.map((c,i)=>{
     ?`<span class="phone-num">${formatPhone(phone)}</span>`
     :`<span class="phone-add">+ add</span>`;
   const safeNm=(nm||'').replace(/'/g,"\\'");
-  return`<tr>
+  const onclick=`openPhoneEdit('${sv.replace(/'/g,"\\'")}','${(mac||'').replace(/'/g,"\\'")}','${(id||'').replace(/'/g,"\\'")}','${safeNm}')`;
+  return{
+    tr:`<tr>
     <td style="color:#64748b;font-size:.78rem">${i+1}</td>
     <td class="customer-name">${nm||id||'\u2014'}</td>
-    <td class="phone-cell" onclick="openPhoneEdit('${sv.replace(/'/g,"\\'")}','${(mac||'').replace(/'/g,"\\'")}','${(id||'').replace(/'/g,"\\'")}','${safeNm}')">${phoneHtml}</td>
+    <td class="phone-cell" onclick="${onclick}">${phoneHtml}</td>
     <td class="mac">${mac||'\u2014'}</td>
     <td><span class="server-tag ${getServerClass(sv)}">${sv}</span></td>
     <td>${formatDate(exp2)}</td>
     <td><span class="status-badge ${sc2}">${sl}</span></td>
     <td>${id||'\u2014'}</td>
-  </tr>`;
-}).join('');
+  </tr>`,
+    card:`<div class="m-card">
+    <div class="m-card-top"><span class="m-card-name">${nm||id||'\u2014'}</span><span class="m-card-num">#${i+1}</span></div>
+    <div class="m-card-row"><span class="m-card-label">Server</span><span class="m-card-val"><span class="server-tag ${getServerClass(sv)}">${sv}</span></span></div>
+    <div class="m-card-row"><span class="m-card-label">MAC</span><span class="m-card-val mac">${mac||'\u2014'}</span></div>
+    <div class="m-card-row"><span class="m-card-label">Expiry</span><span class="m-card-val">${formatDate(exp2)}</span></div>
+    <div class="m-card-row"><span class="m-card-label">Status</span><span class="m-card-val"><span class="status-badge ${sc2}">${sl}</span></span></div>
+    <div class="m-card-phone" onclick="${onclick}">${phoneHtml}</div>
+  </div>`
+  };
+});
+tb.innerHTML=rows.map(r=>r.tr).join('');
+document.getElementById('mobileCards').innerHTML=rows.map(r=>r.card).join('');
 }
 
 function setFilter(f2){currentFilter=f2;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f2));renderTable();}
