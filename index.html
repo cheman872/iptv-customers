@@ -177,8 +177,8 @@ function normalizeDate(d){
   if(!d)return null;
   d=d.replace(/"/g,'').trim();
   if(!d||d.toLowerCase()==='n/a'||d==='-'||d==='')return null;
-  // Strip trailing status text merged with date (e.g. "May 23, 20263 months left" or "Jan 23, 2026Expired")
-  d=d.replace(/(\d{4})\s*(?:\d+\s+(?:months?|days?|weeks?|years?)\s+left|Expired|Active|Unknown).*$/i,'$1').trim();
+  // Strip trailing junk: status text merged with date (e.g. "May 23, 20263 months left", "Jan 23, 2026Expired"), or "+1" suffixes (e.g. "2026-04-28 +1")
+  d=d.replace(/(\d{4}(?:-\d{2}-\d{2})?)\s*(?:[+-]\d+|\d+\s+(?:months?|days?|weeks?|years?)\s+left|Expired|Active|Unknown).*$/i,'$1').trim();
   // YYYY-MM-DD
   if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
   // MM/DD/YYYY or M/D/YYYY
