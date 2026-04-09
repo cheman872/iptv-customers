@@ -132,7 +132,10 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
     <h1>&#128225; IPTV Customer Manager</h1>
     <p>Customer database across all servers &mdash; Live Data</p>
   </div>
-  <button class="logout-btn" onclick="doLogout()">Logout</button>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="logout-btn" onclick="setupGHToken()" title="GitHub token for saving phone edits">&#9881;</button>
+    <button class="logout-btn" onclick="doLogout()">Logout</button>
+  </div>
 </div>
 <div class="controls" style="display:none" id="controlsBar">
   <input type="text" class="search-box" id="searchBox" placeholder="Search by name, MAC, ID, or phone number...">
@@ -207,21 +210,22 @@ let allCustomers=[],currentFilter='all',currentSort={col:'name',asc:true};
 // Phone data
 let phoneData={};
 let editingPhoneKey=null;
+let phoneSha=null; // GitHub file SHA for updates
+const GH_REPO='cheman872/iptv-customers';
+const GH_FILE='phones.json';
+function getGHToken(){return localStorage.getItem('iptv_gh_token')||'';}
+function setGHToken(t){localStorage.setItem('iptv_gh_token',t);}
 
 function getPhoneKey(server,mac,id,name){return server+'|'+(mac||id||name);}
 
 function getPhone(server,mac,id,name){
   const key=getPhoneKey(server,mac,id,name);
-  // Check localStorage overrides first, then remote data
-  const local=localStorage.getItem('iptv_phone_'+key);
-  if(local)return local;
-  const remote=phoneData[key];
-  return remote?remote.phone:null;
+  const entry=phoneData[key];
+  return entry?entry.phone:null;
 }
 
 function formatPhone(phone){
   if(!phone)return null;
-  // Format: +1XXXXXXXXXX -> +1 (XXX) XXX-XXXX
   const clean=phone.replace(/[^\d+]/g,'');
   const m=clean.match(/^\+?1?(\d{3})(\d{3})(\d{4})$/);
   if(m)return`+1 (${m[1]}) ${m[2]}-${m[3]}`;
@@ -231,7 +235,7 @@ function formatPhone(phone){
 function openPhoneEdit(server,mac,id,name){
   editingPhoneKey=getPhoneKey(server,mac,id,name);
   const current=getPhone(server,mac,id,name);
-  document.getElementById('peCustomerName').textContent=name+' — '+server;
+  document.getElementById('peCustomerName').textContent=name+' \u2014 '+server;
   document.getElementById('pePhoneInput').value=current||'';
   document.getElementById('peDeleteBtn').style.display=current?'block':'none';
   document.getElementById('phoneEditOverlay').style.display='flex';
@@ -243,31 +247,72 @@ function closePhoneEdit(){
   editingPhoneKey=null;
 }
 
-function savePhone(){
+async function savePhone(){
   const phone=document.getElementById('pePhoneInput').value.trim();
   if(!phone||!editingPhoneKey){closePhoneEdit();return;}
-  // Clean the number
   let clean=phone.replace(/[\s\-\(\)\.]/g,'');
   if(/^\d{10}$/.test(clean))clean='+1'+clean;
   if(/^1\d{10}$/.test(clean))clean='+'+clean;
-  localStorage.setItem('iptv_phone_'+editingPhoneKey,clean);
-  showSaveIndicator('Saved');
+  phoneData[editingPhoneKey]={phone:clean,manual:true};
   closePhoneEdit();
   renderTable();
+  await pushPhonesToGitHub();
 }
 
-function deletePhone(){
+async function deletePhone(){
   if(!editingPhoneKey)return;
-  localStorage.removeItem('iptv_phone_'+editingPhoneKey);
-  showSaveIndicator('Removed');
+  delete phoneData[editingPhoneKey];
   closePhoneEdit();
   renderTable();
+  await pushPhonesToGitHub();
+}
+
+function setupGHToken(){
+  const current=getGHToken();
+  const token=prompt('Enter GitHub token for saving phone edits.\n\nGet one from: github.com/settings/tokens\n\nCurrent: '+(current?current.substring(0,10)+'...':'not set'));
+  if(token===null)return;
+  if(token==='')localStorage.removeItem('iptv_gh_token');
+  else setGHToken(token.trim());
+  showSaveIndicator(token?'Token saved':'Token removed');
+}
+
+let pushTimeout=null;
+async function pushPhonesToGitHub(){
+  // Debounce rapid edits
+  if(pushTimeout)clearTimeout(pushTimeout);
+  pushTimeout=setTimeout(async()=>{
+    if(!getGHToken()){showSaveIndicator('Saved locally');return;}
+    try{
+      showSaveIndicator('Saving...');
+      const content=btoa(unescape(encodeURIComponent(JSON.stringify(phoneData,null,2))));
+      const body={message:'Update phone numbers',content};
+      if(phoneSha)body.sha=phoneSha;
+      const r=await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${GH_FILE}`,{
+        method:'PUT',
+        headers:{'Authorization':'token '+getGHToken(),'Content-Type':'application/json'},
+        body:JSON.stringify(body)
+      });
+      if(r.ok){
+        const data=await r.json();
+        phoneSha=data.content.sha;
+        showSaveIndicator('Saved');
+      } else {
+        const err=await r.text();
+        console.error('GitHub save failed:',r.status,err);
+        showSaveIndicator('Save failed');
+      }
+    }catch(e){
+      console.error('GitHub save error:',e);
+      showSaveIndicator('Save failed');
+    }
+  },500);
 }
 
 function showSaveIndicator(msg){
   const el=document.getElementById('saveIndicator');
   el.textContent=msg||'Saved';
   el.style.opacity='1';
+  if(msg==='Saving...')return;
   setTimeout(()=>{el.style.opacity='0';},1500);
 }
 
@@ -318,7 +363,24 @@ async function fetchCredits(){
 try{const r=await fetch('https://cheman872.github.io/iptv-customers/credits.json?t='+Date.now());if(!r.ok)return;const data=await r.json();for(const[server,info] of Object.entries(data)){if(!serverMeta[server])serverMeta[server]={users:0,credits:null,lastUpdated:null};serverMeta[server].credits=info.credits;}}catch(e){console.log('Credits fetch failed:',e);}}
 
 async function fetchPhones(){
-try{const r=await fetch('https://cheman872.github.io/iptv-customers/phones.json?t='+Date.now());if(!r.ok)return;phoneData=await r.json();}catch(e){console.log('Phones fetch failed:',e);}}
+try{
+  const token=getGHToken();
+  if(token){
+    // Fetch via GitHub API to get SHA (needed for updates)
+    const r=await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${GH_FILE}`,{
+      headers:{'Authorization':'token '+token}
+    });
+    if(r.ok){
+      const data=await r.json();
+      phoneSha=data.sha;
+      phoneData=JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\n/g,'')))));
+      return;
+    }
+  }
+  // Fallback to GitHub Pages (read-only, edits save locally only)
+  const r2=await fetch('https://cheman872.github.io/iptv-customers/phones.json?t='+Date.now());
+  if(r2.ok)phoneData=await r2.json();
+}catch(e){console.log('Phones fetch failed:',e);}}
 
 async function loadAllData(){
 allCustomers=await fetchFromAppsScript();
