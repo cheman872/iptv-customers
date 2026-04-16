@@ -90,6 +90,18 @@ tbody td{padding:10px 14px}
 .pe-delete{background:#ef444430;color:#f87171;border:1px solid #ef444440!important}.pe-delete:hover{background:#ef4444;color:#fff}
 .save-indicator{position:fixed;bottom:20px;right:20px;background:#22c55e;color:#0f172a;padding:10px 20px;border-radius:8px;font-size:.85rem;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s}
 footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:1px solid #1e293b}
+.sync-bar{padding:10px 30px;background:#0f172a;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:.78rem}
+.sync-overall{color:#94a3b8;display:flex;align-items:center;gap:6px}
+.sync-overall strong{color:#e2e8f0}
+.sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.sync-dot-ok{background:#22c55e}.sync-dot-warn{background:#f59e0b}.sync-dot-old{background:#ef4444}.sync-dot-none{background:#475569}
+.sync-servers{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sync-chip{padding:3px 10px;border-radius:10px;font-size:.7rem;display:inline-flex;align-items:center;gap:5px;border:1px solid #334155;background:#1e293b;color:#94a3b8;white-space:nowrap}
+.sync-chip.ok{border-color:#22c55e40;color:#4ade80;background:#22c55e10}
+.sync-chip.warn{border-color:#f59e0b40;color:#fbbf24;background:#f59e0b10}
+.sync-chip.old{border-color:#ef444440;color:#f87171;background:#ef444410}
+.sync-chip.none{border-color:#33415540;color:#64748b}
+@media(max-width:768px){.sync-bar{padding:8px 16px}.sync-servers{gap:5px}}
 /* Mobile card list (hidden on desktop) */
 .mobile-cards{display:none;padding:12px}
 .m-card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:14px 16px;margin-bottom:10px}
@@ -177,6 +189,13 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
   <button class="filter-btn expired-btn" data-filter="expired" onclick="setFilter('expired')">Expired</button>
 </div>
 <div class="stats" id="statsBar" style="display:none"></div>
+<div class="sync-bar" id="syncBar" style="display:none">
+  <div class="sync-overall">
+    <span class="sync-dot" id="syncOverallDot"></span>
+    Last sync: <strong id="syncOverallTime">—</strong>
+  </div>
+  <div class="sync-servers" id="syncServers"></div>
+</div>
 <div class="credits-bar" id="creditsBar">
   <h3>Credits Remaining</h3>
   <div class="credits-grid" id="creditsGrid"></div>
@@ -417,7 +436,7 @@ async function loadAllData(){
 allCustomers=await fetchFromAppsScript();
 if(!allCustomers||allCustomers.length===0){console.log('Apps Script empty, falling back to Google Sheets');const results=await Promise.all(SERVERS.map(s=>fetchServerData(s)));allCustomers=results.flat();}
 await Promise.all([fetchCredits(),fetchPhones()]);
-document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';document.getElementById('mobileCards').style.display='';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderCredits();renderTable();}
+document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';document.getElementById('mobileCards').style.display='';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderCredits();renderSyncStatus();renderTable();}
 
 function renderCredits(){
 const grid=document.getElementById('creditsGrid');
@@ -527,6 +546,59 @@ function setFilter(f2){currentFilter=f2;document.querySelectorAll('.filter-btn')
 function sortTable(col){if(currentSort.col===col)currentSort.asc=!currentSort.asc;else{currentSort.col=col;currentSort.asc=true;}renderTable();}
 document.getElementById('searchBox').addEventListener('input',renderTable);
 document.getElementById('serverFilter').addEventListener('change',renderTable);
+
+function timeAgo(ts){
+  if(!ts)return null;
+  const d=new Date(ts);
+  if(isNaN(d.getTime()))return null;
+  const mins=Math.floor((Date.now()-d.getTime())/60000);
+  if(mins<1)return'just now';
+  if(mins<60)return mins+'m ago';
+  const hrs=Math.floor(mins/60);
+  if(hrs<24)return hrs+'h ago';
+  const days=Math.floor(hrs/24);
+  return days+'d ago';
+}
+
+function syncClass(ts){
+  if(!ts)return'none';
+  const hrs=(Date.now()-new Date(ts).getTime())/3600000;
+  if(hrs<2)return'ok';
+  if(hrs<24)return'warn';
+  return'old';
+}
+
+function renderSyncStatus(){
+  const servers=Object.entries(serverMeta);
+  if(!servers.length)return;
+  const bar=document.getElementById('syncBar');
+  bar.style.display='flex';
+
+  // Find most recent sync across all servers
+  let latestTs=null;
+  servers.forEach(([,meta])=>{
+    if(meta.lastUpdated){
+      const t=new Date(meta.lastUpdated).getTime();
+      if(!latestTs||t>latestTs)latestTs=t;
+    }
+  });
+
+  const overallAgo=latestTs?timeAgo(new Date(latestTs).toISOString()):null;
+  const overallCls=latestTs?syncClass(new Date(latestTs).toISOString()):'none';
+  const dotEl=document.getElementById('syncOverallDot');
+  dotEl.className='sync-dot sync-dot-'+(overallCls==='ok'?'ok':overallCls==='warn'?'warn':overallCls==='old'?'old':'none');
+  document.getElementById('syncOverallTime').textContent=overallAgo||'Never';
+
+  const allServerNames=['Gold AMCH','GoldSamChe','Gold 4K Premium','Smart Amble2','Smart 2021','Spice','Stream 4K','Titan','Crown'];
+  document.getElementById('syncServers').innerHTML=allServerNames.map(name=>{
+    const meta=serverMeta[name]||{};
+    const ago=meta.lastUpdated?timeAgo(meta.lastUpdated):null;
+    const cls=meta.lastUpdated?syncClass(meta.lastUpdated):'none';
+    const dotCls='sync-dot-'+(cls==='ok'?'ok':cls==='warn'?'warn':cls==='old'?'old':'none');
+    return`<span class="sync-chip ${cls}" title="${name}: ${ago||'Never synced'}"><span class="sync-dot ${dotCls}"></span>${name}: ${ago||'Never'}</span>`;
+  }).join('');
+}
+
 if(sessionStorage.getItem('iptv_auth')==='1')loadAllData();
 </script>
 </body>
