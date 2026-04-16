@@ -551,13 +551,12 @@ function timeAgo(ts){
   if(!ts)return null;
   const d=new Date(ts);
   if(isNaN(d.getTime()))return null;
-  const mins=Math.floor((Date.now()-d.getTime())/60000);
-  if(mins<1)return'just now';
-  if(mins<60)return mins+'m ago';
-  const hrs=Math.floor(mins/60);
-  if(hrs<24)return hrs+'h ago';
-  const days=Math.floor(hrs/24);
-  return days+'d ago';
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const date=`${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  const hrs=d.getHours()%12||12;
+  const mins=String(d.getMinutes()).padStart(2,'0');
+  const ampm=d.getHours()<12?'AM':'PM';
+  return`${date} ${hrs}:${mins} ${ampm}`;
 }
 
 function syncClass(ts){
