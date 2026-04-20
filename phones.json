@@ -1936,5 +1936,9 @@
   "Gold AMCH|00:1A:79:66:34:65": {
     "phone": "+16043401400",
     "manual": true
+  },
+  "Smart Amble2|00:1C:79:61:38:64": {
+    "phone": "+14034043233",
+    "manual": true
   }
 }
