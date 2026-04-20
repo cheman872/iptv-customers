@@ -1924,5 +1924,9 @@
   "Stream 4K|00:1A:79:00:5B:0E": {
     "phone": "+16044462897",
     "manual": true
+  },
+  "Smart Amble2|00:1A:79:B5:C7:D6": {
+    "phone": "+16044462897",
+    "manual": true
   }
 }
