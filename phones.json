@@ -1868,5 +1868,9 @@
     "phone": "7787887723",
     "contactName": "Mike Bodner Titan",
     "auto": true
+  },
+  "Stream 4K|C0:36:00:00:76:74": {
+    "phone": "+12369862357",
+    "manual": true
   }
 }
