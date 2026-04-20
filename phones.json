@@ -1940,5 +1940,9 @@
   "Smart Amble2|00:1C:79:61:38:64": {
     "phone": "+14034043233",
     "manual": true
+  },
+  "Titan|00:1A:79:00:76:D6": {
+    "phone": "+16043678001",
+    "manual": true
   }
 }
