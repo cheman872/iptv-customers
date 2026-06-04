@@ -1,0 +1,30 @@
+[
+  {
+    "date": "2026-05-28T21:41:00.000Z",
+    "servers": {
+      "Gold AMCH": { "credits": "0", "users": null },
+      "GoldSamChe": { "credits": "2", "users": null },
+      "Gold 4K Premium": { "credits": "147", "users": null },
+      "Smart Amble2": { "credits": "86", "users": null },
+      "Smart 2021": { "credits": "37", "users": null },
+      "Spice": { "credits": "85", "users": null },
+      "Stream 4K": { "credits": "216", "users": null },
+      "Titan": { "credits": "183", "users": null },
+      "Crown": { "credits": "13", "users": null }
+    }
+  },
+  {
+    "date": "2026-06-04T07:05:12.400Z",
+    "servers": {
+      "Gold AMCH": { "credits": "0", "users": 89 },
+      "GoldSamChe": { "credits": "2", "users": 67 },
+      "Gold 4K Premium": { "credits": "130", "users": 61 },
+      "Smart Amble2": { "credits": "23", "users": 104 },
+      "Smart 2021": { "credits": "40", "users": 70 },
+      "Spice": { "credits": "85", "users": 4 },
+      "Stream 4K": { "credits": "170", "users": 126 },
+      "Titan": { "credits": "165", "users": 194 },
+      "Crown": { "credits": "108", "users": 40 }
+    }
+  }
+]
