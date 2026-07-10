@@ -150,5 +150,11 @@
       "Titan": 125,
       "Stream 4K": null
     }
+  },
+  {
+    "date": "2026-07-10T23:17:25.922Z",
+    "servers": {
+      "Stream 4K": 111
+    }
   }
 ]
