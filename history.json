@@ -162,5 +162,19 @@
     "servers": {
       "Crown": 26
     }
+  },
+  {
+    "date": "2026-07-15T14:11:39.724Z",
+    "servers": {
+      "Gold AMCH": 53,
+      "GoldSamChe": 53,
+      "Gold 4K Premium": 68,
+      "Smart Amble2": 77,
+      "Smart 2021": 50,
+      "Spice": 0,
+      "Stream 4K": 114,
+      "Titan": 125,
+      "Crown": 26
+    }
   }
 ]
