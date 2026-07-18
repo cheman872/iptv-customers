@@ -267,9 +267,9 @@ function formatLastActive(sv,mac){
   const t=new Date(e.ts.replace(' ','T'));
   if(isNaN(t))return '<span style="color:#475569">—</span>';
   const days=Math.floor((Date.now()-t.getTime())/86400000);
-  const label=days<=0?'today':days===1?'1 day ago':days<30?days+' days ago':days<365?Math.floor(days/30)+'mo ago':Math.floor(days/365)+'yr ago';
+  const label=t.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   const color=days<=7?'#4ade80':days<=30?'#fbbf24':'#f87171';
-  return `<span style="color:${color}" title="${e.ts}${e.ip?' · '+e.ip:''}">${label}</span>`;
+  return `<span style="color:${color}" title="Last active ${e.ts}${e.ip?' · '+e.ip:''}">${label}</span>`;
 }
 async function fetchLastActive(){try{const r=await fetch('https://cheman872.github.io/iptv-customers/lastactive.json?t='+Date.now());if(!r.ok)return;const j=await r.json();lastActiveData=j.data||{};lastActiveGenerated=j.generated||null;}catch(e){console.log('Last-active fetch failed:',e);}}
 
