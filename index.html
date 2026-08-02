@@ -175,7 +175,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
     <p>Customer database across all servers &mdash; Live Data</p>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
-    <button class="logout-btn" onclick="setupGHToken()" title="GitHub token for saving phone edits">&#9881;</button>
+    <button class="logout-btn" onclick="setupGHToken()" title="GitHub token — saves phone edits & messaged flags online">&#9881;</button>
     <button class="logout-btn" onclick="doLogout()">Logout</button>
   </div>
 </div>
@@ -290,10 +290,12 @@ function getMessaged(server,mac,id,name){
   if(e.date&&(Date.now()-new Date(e.date).getTime())/86400000>MSG_EXPIRE_DAYS)return null; // auto-clears after 60 days
   return e;
 }
+function saveMessagedLocal(){try{localStorage.setItem('iptv_messaged',JSON.stringify(messagedData));}catch(e){}}
 async function toggleMessaged(server,mac,id,name,checked){
   const key=getPhoneKey(server,mac,id,name);
   if(checked)messagedData[key]={messaged:true,date:new Date().toISOString()};
   else delete messagedData[key];
+  saveMessagedLocal();
   renderTable();
   await pushMessagedToGitHub();
 }
@@ -313,11 +315,14 @@ async function pushMessagedToGitHub(){
   },600);
 }
 async function fetchMessaged(){
+  // 1) local cache first — survives reloads on this device even with no token
+  try{const ls=localStorage.getItem('iptv_messaged');if(ls)messagedData=JSON.parse(ls);}catch(e){}
   try{
     const token=getGHToken();
-    if(token){const r=await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${MSG_FILE}`,{headers:{'Authorization':'token '+token}});if(r.ok){const d=await r.json();messagedSha=d.sha;messagedData=JSON.parse(decodeURIComponent(escape(atob(d.content))));return;}}
+    if(token){const r=await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${MSG_FILE}`,{headers:{'Authorization':'token '+token}});if(r.ok){const d=await r.json();messagedSha=d.sha;messagedData=JSON.parse(decodeURIComponent(escape(atob(d.content))));saveMessagedLocal();return;}}
+    // no token: published copy is source of truth, but keep any local-only checks
     const r2=await fetch('https://cheman872.github.io/iptv-customers/'+MSG_FILE+'?t='+Date.now());
-    if(r2.ok)messagedData=await r2.json();
+    if(r2.ok){const pub=await r2.json();messagedData={...pub,...messagedData};saveMessagedLocal();}
   }catch(e){console.log('Messaged fetch failed:',e);}
 }
 function getGHToken(){return localStorage.getItem('iptv_gh_token')||'';}
@@ -376,7 +381,7 @@ async function deletePhone(){
 
 function setupGHToken(){
   const current=getGHToken();
-  const token=prompt('Enter GitHub token for saving phone edits.\n\nGet one from: github.com/settings/tokens\n\nCurrent: '+(current?current.substring(0,10)+'...':'not set'));
+  const token=prompt('Enter GitHub token to save phone edits & messaged flags online (syncs across devices).\n\nGet one from: github.com/settings/tokens (repo scope)\n\nCurrent: '+(current?current.substring(0,10)+'...':'not set'));
   if(token===null)return;
   if(token==='')localStorage.removeItem('iptv_gh_token');
   else setGHToken(token.trim());
