@@ -283,7 +283,13 @@ const GH_REPO='cheman872/iptv-customers';
 const GH_FILE='phones.json';
 const MSG_FILE='messaged.json';
 let messagedData={};let messagedSha=null;let msgPushTimeout=null;
-function getMessaged(server,mac,id,name){const e=messagedData[getPhoneKey(server,mac,id,name)];return e&&e.messaged?e:null;}
+const MSG_EXPIRE_DAYS=60;
+function getMessaged(server,mac,id,name){
+  const e=messagedData[getPhoneKey(server,mac,id,name)];
+  if(!e||!e.messaged)return null;
+  if(e.date&&(Date.now()-new Date(e.date).getTime())/86400000>MSG_EXPIRE_DAYS)return null; // auto-clears after 60 days
+  return e;
+}
 async function toggleMessaged(server,mac,id,name,checked){
   const key=getPhoneKey(server,mac,id,name);
   if(checked)messagedData[key]={messaged:true,date:new Date().toISOString()};
