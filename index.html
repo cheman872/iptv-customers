@@ -186,6 +186,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
   <button class="filter-btn" data-filter="active" onclick="setFilter('active')">Active</button>
   <button class="filter-btn" data-filter="7days" onclick="setFilter('7days')">Expiring 7 Days</button>
   <button class="filter-btn" data-filter="14days" onclick="setFilter('14days')">Expiring 14 Days</button>
+  <button class="filter-btn expired-btn" data-filter="expired30" onclick="setFilter('expired30')">Expired &le;30 Days</button>
   <button class="filter-btn expired-btn" data-filter="expired" onclick="setFilter('expired')">Expired</button>
 </div>
 <div class="stats" id="statsBar" style="display:none"></div>
@@ -508,6 +509,11 @@ let f=allCustomers.filter(c=>{
   if(currentFilter==='7days'&&st!=='expiring-7')return false;
   if(currentFilter==='14days'&&!['expiring-7','expiring-14'].includes(st))return false;
   if(currentFilter==='expired'&&st!=='expired')return false;
+  if(currentFilter==='expired30'){
+    if(st!=='expired')return false;
+    const x=new Date(exp+'T00:00:00');const cut=new Date();cut.setHours(0,0,0,0);cut.setDate(cut.getDate()-30);
+    if(isNaN(x.getTime())||x<cut)return false;
+  }
   if(search){
     const phone=getPhone(sv,mac,id,nm)||'';
     if(!nm.toLowerCase().includes(search)&&!mac.toLowerCase().includes(search)&&!id.toLowerCase().includes(search)&&!phone.toLowerCase().includes(search))return false;
