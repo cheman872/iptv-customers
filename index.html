@@ -213,6 +213,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
       <th onclick="sortTable('expiry')">Expiry Date &#9660;</th>
       <th onclick="sortTable('lastactive')">Last Active &#9660;</th>
       <th onclick="sortTable('status')">Status &#9660;</th>
+      <th title="Check when you've messaged this customer">Msg'd</th>
       <th onclick="sortTable('id')">Customer ID &#9660;</th>
     </tr></thead>
     <tbody id="customerTable"></tbody>
@@ -280,6 +281,39 @@ let editingPhoneKey=null;
 let phoneSha=null; // GitHub file SHA for updates
 const GH_REPO='cheman872/iptv-customers';
 const GH_FILE='phones.json';
+const MSG_FILE='messaged.json';
+let messagedData={};let messagedSha=null;let msgPushTimeout=null;
+function getMessaged(server,mac,id,name){const e=messagedData[getPhoneKey(server,mac,id,name)];return e&&e.messaged?e:null;}
+async function toggleMessaged(server,mac,id,name,checked){
+  const key=getPhoneKey(server,mac,id,name);
+  if(checked)messagedData[key]={messaged:true,date:new Date().toISOString()};
+  else delete messagedData[key];
+  renderTable();
+  await pushMessagedToGitHub();
+}
+async function pushMessagedToGitHub(){
+  if(msgPushTimeout)clearTimeout(msgPushTimeout);
+  msgPushTimeout=setTimeout(async()=>{
+    if(!getGHToken()){showSaveIndicator('Saved locally');return;}
+    try{
+      showSaveIndicator('Saving...');
+      const content=btoa(unescape(encodeURIComponent(JSON.stringify(messagedData,null,2))));
+      const body={message:'Update messaged flags',content};
+      if(messagedSha)body.sha=messagedSha;
+      const r=await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${MSG_FILE}`,{method:'PUT',headers:{'Authorization':'token '+getGHToken(),'Content-Type':'application/json'},body:JSON.stringify(body)});
+      if(r.ok){const data=await r.json();messagedSha=data.content.sha;showSaveIndicator('Saved');}
+      else{console.error('Messaged save failed:',r.status,await r.text());showSaveIndicator('Save failed');}
+    }catch(e){console.error('Messaged save error:',e);showSaveIndicator('Save failed');}
+  },600);
+}
+async function fetchMessaged(){
+  try{
+    const token=getGHToken();
+    if(token){const r=await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${MSG_FILE}`,{headers:{'Authorization':'token '+token}});if(r.ok){const d=await r.json();messagedSha=d.sha;messagedData=JSON.parse(decodeURIComponent(escape(atob(d.content))));return;}}
+    const r2=await fetch('https://cheman872.github.io/iptv-customers/'+MSG_FILE+'?t='+Date.now());
+    if(r2.ok)messagedData=await r2.json();
+  }catch(e){console.log('Messaged fetch failed:',e);}
+}
 function getGHToken(){return localStorage.getItem('iptv_gh_token')||'';}
 function setGHToken(t){localStorage.setItem('iptv_gh_token',t);}
 
@@ -452,7 +486,7 @@ try{
 async function loadAllData(){
 allCustomers=await fetchFromAppsScript();
 if(!allCustomers||allCustomers.length===0){console.log('Apps Script empty, falling back to Google Sheets');const results=await Promise.all(SERVERS.map(s=>fetchServerData(s)));allCustomers=results.flat();}
-await Promise.all([fetchCredits(),fetchPhones(),fetchLastActive()]);
+await Promise.all([fetchCredits(),fetchPhones(),fetchLastActive(),fetchMessaged()]);
 document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';document.getElementById('mobileCards').style.display='';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderCredits();renderSyncStatus();renderTable();}
 
 function renderCredits(){
@@ -540,8 +574,12 @@ const rows=f.map((c,i)=>{
     :`<span class="phone-add">+ add</span>`;
   const safeNm=(nm||'').replace(/'/g,"\\'");
   const onclick=`openPhoneEdit('${sv.replace(/'/g,"\\'")}','${(mac||'').replace(/'/g,"\\'")}','${(id||'').replace(/'/g,"\\'")}','${safeNm}')`;
+  const msgd=getMessaged(sv,mac,id,nm);
+  const msgArgs=`'${sv.replace(/'/g,"\\'")}','${(mac||'').replace(/'/g,"\\'")}','${(id||'').replace(/'/g,"\\'")}','${safeNm}'`;
+  const msgTitle=msgd?('Messaged '+new Date(msgd.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})):'Mark as messaged';
+  const msgBox=`<input type="checkbox" ${msgd?'checked':''} onclick="toggleMessaged(${msgArgs},this.checked)" title="${msgTitle}" style="width:16px;height:16px;cursor:pointer;accent-color:#38bdf8">`;
   return{
-    tr:`<tr>
+    tr:`<tr${msgd?' style="opacity:.55"':''}>
     <td style="color:#64748b;font-size:.78rem">${i+1}</td>
     <td class="customer-name">${nm||id||'\u2014'}</td>
     <td class="phone-cell" onclick="${onclick}">${phoneHtml}</td>
@@ -550,6 +588,7 @@ const rows=f.map((c,i)=>{
     <td>${formatDate(exp2)}</td>
     <td style="font-size:.8rem">${formatLastActive(sv,mac)}</td>
     <td><span class="status-badge ${sc2}">${sl}</span></td>
+    <td style="text-align:center">${msgBox}</td>
     <td>${id||'\u2014'}</td>
   </tr>`,
     card:`<div class="m-card">
@@ -559,6 +598,7 @@ const rows=f.map((c,i)=>{
     <div class="m-card-row"><span class="m-card-label">Expiry</span><span class="m-card-val">${formatDate(exp2)}</span></div>
     <div class="m-card-row"><span class="m-card-label">Last Active</span><span class="m-card-val">${formatLastActive(sv,mac)}</span></div>
     <div class="m-card-row"><span class="m-card-label">Status</span><span class="m-card-val"><span class="status-badge ${sc2}">${sl}</span></span></div>
+    <div class="m-card-row"><span class="m-card-label">Messaged</span><span class="m-card-val"><label style="cursor:pointer">${msgBox} ${msgd?'<span style="color:#4ade80;font-size:.75rem">'+msgTitle+'</span>':''}</label></span></div>
     <div class="m-card-phone" onclick="${onclick}">${phoneHtml}</div>
   </div>`
   };
