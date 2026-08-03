@@ -32,6 +32,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172
 .filter-btn{padding:8px 16px;border-radius:8px;border:1px solid #475569;background:#1e293b;color:#94a3b8;font-size:.8rem;cursor:pointer;transition:all .2s;white-space:nowrap}
 .filter-btn:hover,.filter-btn.active{background:#38bdf8;color:#0f172a;border-color:#38bdf8;font-weight:600}
 .filter-btn.expired-btn:hover,.filter-btn.expired-btn.active{background:#ef4444;border-color:#ef4444;color:#fff}
+.filter-btn.dupe-btn:hover,.filter-btn.dupe-btn.active{background:#a78bfa;border-color:#a78bfa;color:#0f172a}
 .server-filter{padding:8px 12px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:.8rem;outline:none;cursor:pointer}
 .stats{padding:12px 30px;background:#1e293b50;display:flex;gap:20px;flex-wrap:wrap;font-size:.8rem;color:#94a3b8;border-bottom:1px solid #334155}
 .stat{display:flex;align-items:center;gap:6px}
@@ -188,6 +189,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
   <button class="filter-btn" data-filter="14days" onclick="setFilter('14days')">Expiring 14 Days</button>
   <button class="filter-btn expired-btn" data-filter="expired30" onclick="setFilter('expired30')">Expired &le;30 Days</button>
   <button class="filter-btn expired-btn" data-filter="expired" onclick="setFilter('expired')">Expired</button>
+  <button class="filter-btn dupe-btn" data-filter="dupes" onclick="setFilter('dupes')" title="Same MAC on 2+ different servers (active or expired)">Duplicate MACs</button>
 </div>
 <div class="stats" id="statsBar" style="display:none"></div>
 <div class="sync-bar" id="syncBar" style="display:none">
@@ -259,6 +261,16 @@ const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwSnjCFNWg4_2dE2N
 const SHEET_ID='1uGu7GWmqHKIP6-2Z7LTRdBenBQovyIKS634lj7wUe34';
 const SERVERS=[{name:'Gold AMCH',gid:0},{name:'GoldSamChe',gid:78207741},{name:'Gold 4K Premium',gid:6151580},{name:'Spice',gid:1946979001},{name:'Smart Amble2',gid:950796683},{name:'Smart 2021',gid:1688805080},{name:'Titan',gid:146800598},{name:'Crown',gid:613843388},{name:'Stream 4K',gid:2123429132}];
 let allCustomers=[],currentFilter='all',currentSort={col:'name',asc:true};
+// MACs that appear on 2+ DIFFERENT servers (active or expired). Cached, rebuilt if data changes.
+let _dupeCache=null,_dupeLen=-1;
+function normMac(m){return (m||'').replace(/[^0-9A-Fa-f]/g,'').toUpperCase();}
+function getDupeMacs(){
+  if(_dupeCache&&_dupeLen===allCustomers.length)return _dupeCache;
+  const map={};
+  for(const c of allCustomers){const m=normMac(c[1]);if(m.length<12)continue;(map[m]=map[m]||new Set()).add(c[4]);}
+  _dupeCache=new Set(Object.keys(map).filter(m=>map[m].size>1));_dupeLen=allCustomers.length;
+  return _dupeCache;
+}
 
 // Last-active data (server|MAC -> {ts, ip})
 let lastActiveData={};let lastActiveGenerated=null;
@@ -568,6 +580,7 @@ let f=allCustomers.filter(c=>{
     const x=new Date(exp+'T00:00:00');const cut=new Date();cut.setHours(0,0,0,0);cut.setDate(cut.getDate()-30);
     if(isNaN(x.getTime())||x<cut)return false;
   }
+  if(currentFilter==='dupes'&&!getDupeMacs().has(normMac(mac)))return false;
   if(search){
     const phone=getPhone(sv,mac,id,nm)||'';
     if(!nm.toLowerCase().includes(search)&&!mac.toLowerCase().includes(search)&&!id.toLowerCase().includes(search)&&!phone.toLowerCase().includes(search))return false;
@@ -627,7 +640,7 @@ tb.innerHTML=rows.map(r=>r.tr).join('');
 document.getElementById('mobileCards').innerHTML=rows.map(r=>r.card).join('');
 }
 
-function setFilter(f2){currentFilter=f2;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f2));renderTable();}
+function setFilter(f2){currentFilter=f2;if(f2==='dupes')currentSort={col:'mac',asc:true};document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f2));renderTable();}
 function sortTable(col){if(currentSort.col===col)currentSort.asc=!currentSort.asc;else{currentSort.col=col;currentSort.asc=true;}renderTable();}
 document.getElementById('searchBox').addEventListener('input',renderTable);
 document.getElementById('serverFilter').addEventListener('change',renderTable);
