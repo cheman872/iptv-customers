@@ -285,7 +285,7 @@ const MSG_FILE='messaged.json';
 // When hosted on getiptvnow.ca, save phones+messaged to the same-origin PHP API (server-side,
 // online, no GitHub token needed). On github.io, PANEL_API is null -> use GitHub as before.
 const PANEL_API=location.hostname.endsWith('getiptvnow.ca')?'api.php':null;
-async function apiGet(file){const r=await fetch(PANEL_API+'?file='+file+'&t='+Date.now());return r.ok?await r.json():{};}
+async function apiGet(file){const r=await fetch(PANEL_API+'?file='+file+'&t='+Date.now());if(!r.ok)return{};const j=await r.json();return(j&&typeof j==='object'&&!Array.isArray(j))?j:{};}
 async function apiPost(file,data){try{const r=await fetch(PANEL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file,data})});return r.ok;}catch(e){return false;}}
 let messagedData={};let messagedSha=null;let msgPushTimeout=null;
 const MSG_EXPIRE_DAYS=60;
