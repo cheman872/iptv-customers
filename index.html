@@ -519,7 +519,7 @@ async function loadAllData(){
 allCustomers=await fetchFromAppsScript();
 if(!allCustomers||allCustomers.length===0){console.log('Apps Script empty, falling back to Google Sheets');const results=await Promise.all(SERVERS.map(s=>fetchServerData(s)));allCustomers=results.flat();}
 await Promise.all([fetchCredits(),fetchPhones(),fetchLastActive(),fetchMessaged()]);
-document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';document.getElementById('mobileCards').style.display='';const sf=document.getElementById('serverFilter');[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderCredits();renderSyncStatus();renderTable();}
+document.getElementById('loadingDiv').style.display='none';document.getElementById('controlsBar').style.display='flex';document.getElementById('statsBar').style.display='flex';document.getElementById('mainTable').style.display='table';document.getElementById('mobileCards').style.display='';const sf=document.getElementById('serverFilter');sf.innerHTML='<option value="">All Servers</option>';[...new Set(allCustomers.map(c=>c[4]))].sort().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o);});renderCredits();renderSyncStatus();renderTable();}
 
 function renderCredits(){
 const grid=document.getElementById('creditsGrid');
@@ -696,7 +696,7 @@ function renderSyncStatus(){
   }).join('');
 }
 
-if(sessionStorage.getItem('iptv_auth')==='1')loadAllData();
+if(sessionStorage.getItem('iptv_auth')==='1'){document.getElementById('loginOverlay').style.display='none';document.getElementById('appContainer').style.display='block';loadAllData();}
 </script>
 </body>
 </html>
