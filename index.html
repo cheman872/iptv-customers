@@ -282,6 +282,11 @@ let phoneSha=null; // GitHub file SHA for updates
 const GH_REPO='cheman872/iptv-customers';
 const GH_FILE='phones.json';
 const MSG_FILE='messaged.json';
+// When hosted on getiptvnow.ca, save phones+messaged to the same-origin PHP API (server-side,
+// online, no GitHub token needed). On github.io, PANEL_API is null -> use GitHub as before.
+const PANEL_API=location.hostname.endsWith('getiptvnow.ca')?'api.php':null;
+async function apiGet(file){const r=await fetch(PANEL_API+'?file='+file+'&t='+Date.now());return r.ok?await r.json():{};}
+async function apiPost(file,data){try{const r=await fetch(PANEL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file,data})});return r.ok;}catch(e){return false;}}
 let messagedData={};let messagedSha=null;let msgPushTimeout=null;
 const MSG_EXPIRE_DAYS=60;
 function getMessaged(server,mac,id,name){
@@ -302,6 +307,7 @@ async function toggleMessaged(server,mac,id,name,checked){
 async function pushMessagedToGitHub(){
   if(msgPushTimeout)clearTimeout(msgPushTimeout);
   msgPushTimeout=setTimeout(async()=>{
+    if(PANEL_API){showSaveIndicator('Saving...');const ok=await apiPost('messaged',messagedData);showSaveIndicator(ok?'Saved':'Save failed');return;}
     if(!getGHToken()){showSaveIndicator('Saved locally');return;}
     try{
       showSaveIndicator('Saving...');
@@ -317,6 +323,7 @@ async function pushMessagedToGitHub(){
 async function fetchMessaged(){
   // 1) local cache first — survives reloads on this device even with no token
   try{const ls=localStorage.getItem('iptv_messaged');if(ls)messagedData=JSON.parse(ls);}catch(e){}
+  if(PANEL_API){try{messagedData=await apiGet('messaged');saveMessagedLocal();return;}catch(e){console.log('api messaged fetch failed',e);}}
   try{
     const token=getGHToken();
     if(token){const r=await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${MSG_FILE}`,{headers:{'Authorization':'token '+token}});if(r.ok){const d=await r.json();messagedSha=d.sha;messagedData=JSON.parse(decodeURIComponent(escape(atob(d.content))));saveMessagedLocal();return;}}
@@ -393,6 +400,7 @@ async function pushPhonesToGitHub(){
   // Debounce rapid edits
   if(pushTimeout)clearTimeout(pushTimeout);
   pushTimeout=setTimeout(async()=>{
+    if(PANEL_API){showSaveIndicator('Saving...');const ok=await apiPost('phones',phoneData);showSaveIndicator(ok?'Saved':'Save failed');return;}
     if(!getGHToken()){showSaveIndicator('Saved locally');return;}
     try{
       showSaveIndicator('Saving...');
@@ -476,6 +484,7 @@ try{const r=await fetch('https://cheman872.github.io/iptv-customers/credits.json
 
 async function fetchPhones(){
 try{
+  if(PANEL_API){try{phoneData=await apiGet('phones');return;}catch(e){console.log('api phones fetch failed',e);}}
   const token=getGHToken();
   if(token){
     // Fetch via GitHub API to get SHA (needed for updates)
