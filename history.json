@@ -273,5 +273,11 @@
       "Stream 4K": 120,
       "Titan": null
     }
+  },
+  {
+    "date": "2026-08-04T03:26:22.898Z",
+    "servers": {
+      "Gold AMCH": 51
+    }
   }
 ]
