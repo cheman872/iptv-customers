@@ -401,5 +401,19 @@
     "servers": {
       "Gold AMCH": 43
     }
+  },
+  {
+    "date": "2026-08-31T09:04:31.071Z",
+    "servers": {
+      "Gold AMCH": 43,
+      "GoldSamChe": 37,
+      "Gold 4K Premium": 88,
+      "Smart Amble2": 74,
+      "Smart 2021": 45,
+      "Spice": 0,
+      "Stream 4K": 123,
+      "Titan": 119,
+      "Crown": 22
+    }
   }
 ]
