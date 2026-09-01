@@ -33,6 +33,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172
 .filter-btn:hover,.filter-btn.active{background:#38bdf8;color:#0f172a;border-color:#38bdf8;font-weight:600}
 .filter-btn.expired-btn:hover,.filter-btn.expired-btn.active{background:#ef4444;border-color:#ef4444;color:#fff}
 .filter-btn.dupe-btn:hover,.filter-btn.dupe-btn.active{background:#a78bfa;border-color:#a78bfa;color:#0f172a}
+.filter-btn.dormant-btn:hover,.filter-btn.dormant-btn.active{background:#fb923c;border-color:#fb923c;color:#0f172a}
 .server-filter{padding:8px 12px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:.8rem;outline:none;cursor:pointer}
 .stats{padding:12px 30px;background:#1e293b50;display:flex;gap:20px;flex-wrap:wrap;font-size:.8rem;color:#94a3b8;border-bottom:1px solid #334155}
 .stat{display:flex;align-items:center;gap:6px}
@@ -190,6 +191,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
   <button class="filter-btn expired-btn" data-filter="expired30" onclick="setFilter('expired30')">Expired &le;30 Days</button>
   <button class="filter-btn expired-btn" data-filter="expired" onclick="setFilter('expired')">Expired</button>
   <button class="filter-btn dupe-btn" data-filter="dupes" onclick="setFilter('dupes')" title="Same MAC on 2+ different servers (active or expired)">Duplicate MACs</button>
+  <button class="filter-btn dormant-btn" data-filter="dormant" onclick="setFilter('dormant')" title="Not-expired customers whose last active is over 40 days ago (gone dark)">Dormant 40d+</button>
 </div>
 <div class="stats" id="statsBar" style="display:none"></div>
 <div class="sync-bar" id="syncBar" style="display:none">
@@ -581,6 +583,13 @@ let f=allCustomers.filter(c=>{
     if(isNaN(x.getTime())||x<cut)return false;
   }
   if(currentFilter==='dupes'&&!getDupeMacs().has(normMac(mac)))return false;
+  if(currentFilter==='dormant'){
+    if(st==='expired'||st==='unknown')return false; // still-paying customers only
+    const e=getLastActive(sv,mac);
+    if(!e)return false; // no last-active data — can't judge
+    const t=new Date(e.ts.replace(' ','T'));
+    if(isNaN(t.getTime())||(Date.now()-t.getTime())/86400000<40)return false;
+  }
   if(search){
     const phone=getPhone(sv,mac,id,nm)||'';
     if(!nm.toLowerCase().includes(search)&&!mac.toLowerCase().includes(search)&&!id.toLowerCase().includes(search)&&!phone.toLowerCase().includes(search))return false;
@@ -640,7 +649,7 @@ tb.innerHTML=rows.map(r=>r.tr).join('');
 document.getElementById('mobileCards').innerHTML=rows.map(r=>r.card).join('');
 }
 
-function setFilter(f2){currentFilter=f2;if(f2==='dupes')currentSort={col:'mac',asc:true};document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f2));renderTable();}
+function setFilter(f2){currentFilter=f2;if(f2==='dupes')currentSort={col:'mac',asc:true};if(f2==='dormant')currentSort={col:'lastactive',asc:true};document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f2));renderTable();}
 function sortTable(col){if(currentSort.col===col)currentSort.asc=!currentSort.asc;else{currentSort.col=col;currentSort.asc=true;}renderTable();}
 document.getElementById('searchBox').addEventListener('input',renderTable);
 document.getElementById('serverFilter').addEventListener('change',renderTable);
