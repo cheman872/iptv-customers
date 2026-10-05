@@ -558,5 +558,17 @@
       "Titan": 114,
       "Crown": 22
     }
+  },
+  {
+    "date": "2026-10-05T09:06:54.946Z",
+    "servers": {
+      "Gold AMCH": 30,
+      "GoldSamChe": 32,
+      "Gold 4K Premium": 99,
+      "Smart Amble2": 77,
+      "Smart 2021": 40,
+      "Spice": 0,
+      "Stream 4K": 143
+    }
   }
 ]
