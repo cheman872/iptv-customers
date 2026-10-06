@@ -231,6 +231,11 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
 <script>
 // Auth
 const _u='amcheema',_p='Che872ac10';
+// On getiptvnow.ca the PHP gateway (Basic Auth) has already authenticated this request, so skip the page's own login form.
+const AUTO_AUTH=location.hostname.endsWith('getiptvnow.ca');
+if(AUTO_AUTH){try{sessionStorage.setItem('iptv_auth','1');}catch(e){}}
+// Authed if the server gateway already checked us (AUTO_AUTH) or the page form was passed this tab.
+function isAuthed(){try{return AUTO_AUTH||sessionStorage.getItem('iptv_auth')==='1';}catch(e){return AUTO_AUTH;}}
 function doLogin(){
   const u=document.getElementById('loginUser').value.trim();
   const p=document.getElementById('loginPass').value;
@@ -253,10 +258,13 @@ function doLogout(){
 }
 document.getElementById('loginPass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('loginUser').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('loginPass').focus();});
-if(sessionStorage.getItem('iptv_auth')==='1'){
+if(isAuthed()){
   document.getElementById('loginOverlay').style.display='none';
   document.getElementById('appContainer').style.display='block';
 }
+// Behind the server gateway the page form is never needed, so a Logout button would only bring it back
+// (and cannot clear the browser's saved Basic-Auth password anyway). Close the browser to end the session.
+if(AUTO_AUTH){document.querySelectorAll('.logout-btn').forEach(b=>b.style.display='none');}
 
 // App
 const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwSnjCFNWg4_2dE2NGByh6s1umLKk2yd-bm588c6y5gjX8xzyThR6Aoq-T-nDB2O2-F/exec';
@@ -705,7 +713,7 @@ function renderSyncStatus(){
   }).join('');
 }
 
-if(sessionStorage.getItem('iptv_auth')==='1'){document.getElementById('loginOverlay').style.display='none';document.getElementById('appContainer').style.display='block';loadAllData();}
+if(isAuthed()){document.getElementById('loginOverlay').style.display='none';document.getElementById('appContainer').style.display='block';loadAllData();}
 </script>
 </body>
 </html>
