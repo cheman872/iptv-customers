@@ -22,6 +22,8 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172
 .header-left p{font-size:.85rem;color:#94a3b8}
 .logout-btn{padding:6px 14px;border-radius:8px;border:1px solid #475569;background:#1e293b;color:#94a3b8;font-size:.8rem;cursor:pointer;transition:all .2s}
 .logout-btn:hover{background:#ef4444;color:#fff;border-color:#ef4444}
+.orders-link{padding:6px 14px;border-radius:8px;border:1px solid #38bdf8;background:#38bdf8;color:#0f172a;font-size:.8rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:all .2s}
+.orders-link:hover{background:#0ea5e9;border-color:#0ea5e9}
 .loading{text-align:center;padding:60px 20px;color:#94a3b8;font-size:1rem}
 .loading .spinner{display:inline-block;width:40px;height:40px;border:3px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -177,6 +179,7 @@ footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:
     <p>Customer database across all servers &mdash; Live Data</p>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
+    <a class="orders-link" href="https://getiptvnow.ca/panel/orders.php" title="Website orders: mark paid, check, activate">&#128722; Orders</a>
     <button class="logout-btn" onclick="setupGHToken()" title="GitHub token — saves phone edits & messaged flags online">&#9881;</button>
     <button class="logout-btn" onclick="doLogout()">Logout</button>
   </div>
