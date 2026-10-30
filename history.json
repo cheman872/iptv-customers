@@ -738,5 +738,19 @@
       "Stream 4K": 158,
       "Crown": 20
     }
+  },
+  {
+    "date": "2026-10-30T09:03:58.796Z",
+    "servers": {
+      "Gold AMCH": 15,
+      "GoldSamChe": 32,
+      "Gold 4K Premium": 113,
+      "Smart Amble2": 79,
+      "Smart 2021": 39,
+      "Spice": 0,
+      "Stream 4K": 158,
+      "Titan": 112,
+      "Crown": 20
+    }
   }
 ]
