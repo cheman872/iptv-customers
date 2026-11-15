@@ -971,5 +971,11 @@
       "Titan": null,
       "Crown": null
     }
+  },
+  {
+    "date": "2026-11-15T11:57:06.879Z",
+    "servers": {
+      "Titan": 112
+    }
   }
 ]
