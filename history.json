@@ -1043,5 +1043,20 @@
     "servers": {
       "Ikon 4K": 10
     }
+  },
+  {
+    "date": "2026-11-17T12:53:47.465Z",
+    "servers": {
+      "Gold AMCH": 14,
+      "GoldSamChe": 32,
+      "Gold 4K Premium": 116,
+      "Smart Amble2": 82,
+      "Smart 2021": 38,
+      "Spice": 1,
+      "Ikon 4K": 10,
+      "Stream 4K": null,
+      "Titan": null,
+      "Crown": null
+    }
   }
 ]
